@@ -26,6 +26,30 @@
           </template>
         </el-table-column>
         <el-table-column prop="description" label="描述" />
+        <el-table-column label="GoHttpServer地址" min-width="200">
+          <template #default="scope">
+            <div v-if="scope.row.gohttpserverUrl">
+              <el-link 
+                type="primary" 
+                :href="scope.row.gohttpserverUrl" 
+                target="_blank"
+                :underline="false"
+              >
+                <el-icon><Link /></el-icon>
+                {{ getShortUrl(scope.row.gohttpserverUrl) }}
+              </el-link>
+              <el-button 
+                size="small" 
+                type="text" 
+                @click="copyUrl(scope.row.gohttpserverUrl)"
+                style="margin-left: 8px;"
+              >
+                <el-icon><CopyDocument /></el-icon>
+              </el-button>
+            </div>
+            <span v-else style="color: #909399;">未上传</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="status" label="状态">
           <template #default="scope">
             <el-tag :type="scope.row.status === 1 ? 'success' : 'danger'">
@@ -34,9 +58,8 @@
           </template>
         </el-table-column>
         <el-table-column prop="createTime" label="创建时间" />
-        <el-table-column label="操作" width="200">
+        <el-table-column label="操作" width="120">
           <template #default="scope">
-            <el-button size="small" @click="handleEdit(scope.row)">编辑</el-button>
             <el-button size="small" type="danger" @click="handleDelete(scope.row)">删除</el-button>
           </template>
         </el-table-column>
@@ -104,52 +127,14 @@
       </template>
     </el-dialog>
 
-    <!-- 编辑对话框 -->
-    <el-dialog
-      v-model="editDialogVisible"
-      title="编辑用例集"
-      width="500px"
-    >
-      <el-form
-        ref="editFormRef"
-        :model="editForm"
-        :rules="editRules"
-        label-width="100px"
-      >
-        <el-form-item label="用例集名称" prop="name">
-          <el-input v-model="editForm.name" placeholder="请输入用例集名称" />
-        </el-form-item>
-        <el-form-item label="版本" prop="version">
-          <el-input v-model="editForm.version" placeholder="请输入版本" />
-        </el-form-item>
-        <el-form-item label="描述" prop="description">
-          <el-input
-            v-model="editForm.description"
-            type="textarea"
-            :rows="3"
-            placeholder="请输入描述"
-          />
-        </el-form-item>
-        <el-form-item label="状态" prop="status">
-          <el-radio-group v-model="editForm.status">
-            <el-radio :label="1">启用</el-radio>
-            <el-radio :label="0">禁用</el-radio>
-          </el-radio-group>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="editDialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="submitEdit">确定</el-button>
-        </span>
-      </template>
-    </el-dialog>
+
   </div>
 </template>
 
 <script>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Link, CopyDocument } from '@element-plus/icons-vue'
 import request from '@/utils/request'
 
 export default {
@@ -158,9 +143,7 @@ export default {
     const loading = ref(false)
     const tableData = ref([])
     const uploadDialogVisible = ref(false)
-    const editDialogVisible = ref(false)
     const uploadFormRef = ref()
-    const editFormRef = ref()
     const uploadRef = ref()
 
     const pagination = reactive({
@@ -174,13 +157,7 @@ export default {
       description: '',
     })
 
-    const editForm = reactive({
-      id: null,
-      name: '',
-      version: '',
-      description: '',
-      status: 1,
-    })
+
 
     const uploadRules = {
       file: [
@@ -188,14 +165,7 @@ export default {
       ],
     }
 
-    const editRules = {
-      name: [
-        { required: true, message: '请输入用例集名称', trigger: 'blur' },
-      ],
-      version: [
-        { required: true, message: '请输入版本', trigger: 'blur' },
-      ],
-    }
+
 
     const formatFileSize = (bytes) => {
       if (bytes === 0) return '0 B'
@@ -203,6 +173,32 @@ export default {
       const sizes = ['B', 'KB', 'MB', 'GB']
       const i = Math.floor(Math.log(bytes) / Math.log(k))
       return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+    }
+
+    const getShortUrl = (url) => {
+      if (!url) return ''
+      try {
+        const urlObj = new URL(url)
+        return `${urlObj.hostname}:${urlObj.port}${urlObj.pathname}`
+      } catch (e) {
+        return url
+      }
+    }
+
+    const copyUrl = async (url) => {
+      try {
+        await navigator.clipboard.writeText(url)
+        ElMessage.success('URL已复制到剪贴板')
+      } catch (err) {
+        // 降级方案
+        const textArea = document.createElement('textarea')
+        textArea.value = url
+        document.body.appendChild(textArea)
+        textArea.select()
+        document.execCommand('copy')
+        document.body.removeChild(textArea)
+        ElMessage.success('URL已复制到剪贴板')
+      }
     }
 
     const loadData = async () => {
@@ -277,28 +273,7 @@ export default {
       }
     }
 
-    const handleEdit = (row) => {
-      Object.assign(editForm, row)
-      editDialogVisible.value = true
-    }
 
-    const submitEdit = async () => {
-      try {
-        await editFormRef.value.validate()
-        
-        await request({
-          url: `/test-case-set/${editForm.id}`,
-          method: 'put',
-          data: editForm,
-        })
-        
-        ElMessage.success('更新成功')
-        editDialogVisible.value = false
-        loadData()
-      } catch (error) {
-        console.error('更新失败:', error)
-      }
-    }
 
     const handleDelete = async (row) => {
       try {
@@ -350,22 +325,18 @@ export default {
       tableData,
       pagination,
       uploadDialogVisible,
-      editDialogVisible,
       uploadFormRef,
-      editFormRef,
       uploadRef,
       uploadForm,
-      editForm,
       uploadRules,
-      editRules,
       formatFileSize,
+      getShortUrl,
+      copyUrl,
       loadData,
       handleUpload,
       handleFileChange,
       beforeUpload,
       submitUpload,
-      handleEdit,
-      submitEdit,
       handleDelete,
       resetUploadForm,
       handleSizeChange,
@@ -391,5 +362,19 @@ export default {
 .pagination {
   margin-top: 20px;
   text-align: right;
+}
+
+/* GoHttpServer地址列样式 */
+.el-table .el-link {
+  font-size: 12px;
+}
+
+.el-table .el-button--text {
+  padding: 2px 4px;
+  font-size: 12px;
+}
+
+.el-table .el-icon {
+  margin-right: 4px;
 }
 </style>
