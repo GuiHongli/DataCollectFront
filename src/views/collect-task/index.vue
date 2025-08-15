@@ -200,32 +200,7 @@
           </el-form>
         </div>
 
-        <!-- 步骤4：执行 -->
-        <div class="step-panel">
-          <h3 class="step-title">执行</h3>
-          <div class="execution-summary">
-            <h4>任务配置摘要</h4>
-            <el-descriptions :column="2" border>
-              <el-descriptions-item label="任务名称">{{ basicForm.name }}</el-descriptions-item>
-              <el-descriptions-item label="任务描述">{{ basicForm.description || '暂无描述' }}</el-descriptions-item>
-              <el-descriptions-item label="采集策略">{{ selectedStrategy ? selectedStrategy.name : '' }}</el-descriptions-item>
-              <el-descriptions-item label="采集次数">{{ selectedStrategy ? selectedStrategy.collectCount : 0 }}次</el-descriptions-item>
-              <el-descriptions-item label="关联用例集">{{ selectedStrategy ? `${selectedStrategy.testCaseSetName} (${selectedStrategy.testCaseSetVersion})` : '' }}</el-descriptions-item>
-              <el-descriptions-item label="测试用例数量">{{ selectedStrategy && selectedStrategy.testCaseList ? selectedStrategy.testCaseList.length : 0 }}个</el-descriptions-item>
-              <el-descriptions-item label="执行环境" :span="2">{{ environmentSummary }}</el-descriptions-item>
-            </el-descriptions>
-            
-            <div class="execution-options">
-              <h4>执行选项</h4>
-              <el-form-item label="执行计划" prop="schedule">
-                <el-input v-model="executionForm.schedule" placeholder="请输入Cron表达式，如：0 0 */1 * * ?" />
-              </el-form-item>
-              <el-form-item label="立即执行">
-                <el-switch v-model="executionForm.executeNow" />
-              </el-form-item>
-            </div>
-          </div>
-        </div>
+
       </div>
 
       <!-- 操作按钮 -->
@@ -317,11 +292,7 @@ export default {
       ],
     }
 
-    // 步骤4：执行表单
-    const executionForm = reactive({
-      schedule: '',
-      executeNow: false,
-    })
+
 
     const getStatusType = (status) => {
       const typeMap = {
@@ -402,7 +373,8 @@ export default {
           url: '/region/list',
           method: 'get',
         })
-        regionOptions.value = res.data
+        // 只显示顶级地域（level=1）的信息
+        regionOptions.value = res.data.filter(region => region.level === 1)
       } catch (error) {
         console.error('加载地域数据失败:', error)
       }
@@ -411,10 +383,11 @@ export default {
     const loadCountryOptions = async (regionId) => {
       try {
         const res = await request({
-          url: `/region/${regionId}/countries`,
+          url: `/region/parent/${regionId}`,
           method: 'get',
         })
-        countryOptions.value = res.data
+        // 只显示国家级别（level=2）的数据
+        countryOptions.value = res.data.filter(region => region.level === 2)
       } catch (error) {
         console.error('加载国家数据失败:', error)
       }
@@ -423,10 +396,11 @@ export default {
     const loadProvinceOptions = async (countryId) => {
       try {
         const res = await request({
-          url: `/region/country/${countryId}/provinces`,
+          url: `/region/parent/${countryId}`,
           method: 'get',
         })
-        provinceOptions.value = res.data
+        // 只显示省份级别（level=3）的数据
+        provinceOptions.value = res.data.filter(region => region.level === 3)
       } catch (error) {
         console.error('加载省份数据失败:', error)
       }
@@ -435,10 +409,11 @@ export default {
     const loadCityOptions = async (provinceId) => {
       try {
         const res = await request({
-          url: `/region/province/${provinceId}/cities`,
+          url: `/region/parent/${provinceId}`,
           method: 'get',
         })
-        cityOptions.value = res.data
+        // 只显示城市级别（level=4）的数据
+        cityOptions.value = res.data.filter(region => region.level === 4)
       } catch (error) {
         console.error('加载城市数据失败:', error)
       }
@@ -578,8 +553,6 @@ export default {
           name: basicForm.name,
           description: basicForm.description,
           strategyId: strategyForm.strategyId,
-          schedule: executionForm.schedule,
-          executeNow: executionForm.executeNow,
           regionId: environmentForm.regionId,
           countryId: environmentForm.countryId,
           provinceId: environmentForm.provinceId,
@@ -625,10 +598,7 @@ export default {
         cityId: null,
       })
       
-      Object.assign(executionForm, {
-        schedule: '',
-        executeNow: false,
-      })
+
       
       // 重置选项数据
       selectedStrategy.value = null
@@ -679,7 +649,7 @@ export default {
       strategyRules,
       environmentForm,
       environmentRules,
-      executionForm,
+
       strategyOptions,
       regionOptions,
       countryOptions,
@@ -782,25 +752,5 @@ export default {
   font-weight: 600;
 }
 
-/* 执行摘要样式 */
-.execution-summary h4 {
-  margin: 0 0 16px 0;
-  color: #303133;
-  font-size: 16px;
-  font-weight: 600;
-}
 
-.execution-options {
-  margin-top: 20px;
-  padding: 16px;
-  background-color: #f5f7fa;
-  border-radius: 4px;
-}
-
-.execution-options h4 {
-  margin: 0 0 12px 0;
-  color: #303133;
-  font-size: 14px;
-  font-weight: 600;
-}
 </style>
