@@ -85,6 +85,13 @@ const routes = [
         component: () => import('@/views/test-case-set/index.vue'),
         meta: { title: '用例集管理', icon: 'Document' },
       },
+      {
+        path: 'detail/:id',
+        name: 'TestCaseSetDetail',
+        component: () => import('@/views/test-case-set/detail.vue'),
+        meta: { title: '用例集详情', icon: 'Document' },
+        hidden: true,
+      },
     ],
   },
   {

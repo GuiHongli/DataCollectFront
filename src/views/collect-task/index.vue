@@ -76,55 +76,169 @@
       </div>
     </el-card>
 
-    <!-- 新增/编辑对话框 -->
+    <!-- 4步创建对话框 -->
     <el-dialog
       v-model="dialogVisible"
       :title="dialogTitle"
-      width="500px"
+      width="800px"
       @close="resetForm"
     >
-      <el-form
-        ref="formRef"
-        :model="form"
-        :rules="rules"
-        label-width="120px"
-      >
-        <el-form-item label="任务名称" prop="name">
-          <el-input v-model="form.name" placeholder="请输入任务名称" />
-        </el-form-item>
-        <el-form-item label="关联策略" prop="strategyId">
-          <el-select v-model="form.strategyId" placeholder="请选择关联策略" style="width: 100%">
-            <el-option
-              v-for="item in strategyOptions"
-              :key="item.id"
-              :label="item.name"
-              :value="item.id"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="执行计划" prop="schedule">
-          <el-input v-model="form.schedule" placeholder="请输入Cron表达式，如：0 0 */1 * * ?" />
-        </el-form-item>
-        <el-form-item label="描述" prop="description">
-          <el-input
-            v-model="form.description"
-            type="textarea"
-            :rows="3"
-            placeholder="请输入描述"
-          />
-        </el-form-item>
-        <el-form-item label="状态" prop="status">
-          <el-radio-group v-model="form.status">
-            <el-radio :label="0">停止</el-radio>
-            <el-radio :label="1">运行中</el-radio>
-            <el-radio :label="2">暂停</el-radio>
-          </el-radio-group>
-        </el-form-item>
-      </el-form>
+      <!-- 步骤内容 -->
+      <div class="step-content">
+        <!-- 步骤1：基本信息 -->
+        <div class="step-panel">
+          <h3 class="step-title">基本信息</h3>
+          <el-form
+            ref="basicFormRef"
+            :model="basicForm"
+            :rules="basicRules"
+            label-width="120px"
+          >
+            <el-form-item label="任务名称" prop="name">
+              <el-input v-model="basicForm.name" placeholder="请输入采集任务名称" />
+            </el-form-item>
+            <el-form-item label="任务描述" prop="description">
+              <el-input
+                v-model="basicForm.description"
+                type="textarea"
+                :rows="3"
+                placeholder="请输入任务描述"
+              />
+            </el-form-item>
+          </el-form>
+        </div>
+
+        <!-- 步骤2：采集策略 -->
+        <div class="step-panel">
+          <h3 class="step-title">采集策略</h3>
+          <el-form
+            ref="strategyFormRef"
+            :model="strategyForm"
+            :rules="strategyRules"
+            label-width="120px"
+          >
+            <el-form-item label="采集策略" prop="strategyId">
+              <el-select v-model="strategyForm.strategyId" placeholder="请选择采集策略" style="width: 100%" @change="handleStrategyChange">
+                <el-option
+                  v-for="item in strategyOptions"
+                  :key="item.id"
+                  :label="`${item.name} (${item.collectCount}次采集)`"
+                  :value="item.id"
+                />
+              </el-select>
+            </el-form-item>
+            <div v-if="selectedStrategy" class="strategy-info">
+              <h4>策略详情</h4>
+              <el-descriptions :column="1" border size="small">
+                <el-descriptions-item label="策略名称">{{ selectedStrategy.name }}</el-descriptions-item>
+                <el-descriptions-item label="采集次数">{{ selectedStrategy.collectCount }}次</el-descriptions-item>
+                <el-descriptions-item label="关联用例集">{{ selectedStrategy.testCaseSetName }} ({{ selectedStrategy.testCaseSetVersion }})</el-descriptions-item>
+                <el-descriptions-item label="测试用例数量">{{ selectedStrategy.testCaseList ? selectedStrategy.testCaseList.length : 0 }}个</el-descriptions-item>
+              </el-descriptions>
+            </div>
+          </el-form>
+        </div>
+
+        <!-- 步骤3：环境编排 -->
+        <div class="step-panel">
+          <h3 class="step-title">环境编排</h3>
+          <el-form
+            ref="environmentFormRef"
+            :model="environmentForm"
+            :rules="environmentRules"
+            label-width="120px"
+          >
+            <el-form-item label="地域筛选" prop="regionId">
+              <el-select v-model="environmentForm.regionId" placeholder="请选择地域" style="width: 100%" @change="handleRegionChange">
+                <el-option
+                  v-for="item in regionOptions"
+                  :key="item.id"
+                  :label="item.name"
+                  :value="item.id"
+                />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="国家筛选" prop="countryId">
+              <el-select v-model="environmentForm.countryId" placeholder="请选择国家" style="width: 100%" @change="handleCountryChange" :disabled="!environmentForm.regionId">
+                <el-option
+                  v-for="item in countryOptions"
+                  :key="item.id"
+                  :label="item.name"
+                  :value="item.id"
+                />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="省份筛选" prop="provinceId">
+              <el-select v-model="environmentForm.provinceId" placeholder="请选择省份" style="width: 100%" @change="handleProvinceChange" :disabled="!environmentForm.countryId">
+                <el-option
+                  v-for="item in provinceOptions"
+                  :key="item.id"
+                  :label="item.name"
+                  :value="item.id"
+                />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="城市筛选" prop="cityId">
+              <el-select v-model="environmentForm.cityId" placeholder="请选择城市" style="width: 100%" :disabled="!environmentForm.provinceId">
+                <el-option
+                  v-for="item in cityOptions"
+                  :key="item.id"
+                  :label="item.name"
+                  :value="item.id"
+                />
+              </el-select>
+            </el-form-item>
+            <div class="environment-summary">
+              <h4>环境配置摘要</h4>
+              <el-alert
+                :title="environmentSummary"
+                type="info"
+                :closable="false"
+                show-icon
+              />
+            </div>
+          </el-form>
+        </div>
+
+        <!-- 步骤4：执行 -->
+        <div class="step-panel">
+          <h3 class="step-title">执行</h3>
+          <div class="execution-summary">
+            <h4>任务配置摘要</h4>
+            <el-descriptions :column="2" border>
+              <el-descriptions-item label="任务名称">{{ basicForm.name }}</el-descriptions-item>
+              <el-descriptions-item label="任务描述">{{ basicForm.description || '暂无描述' }}</el-descriptions-item>
+              <el-descriptions-item label="采集策略">{{ selectedStrategy ? selectedStrategy.name : '' }}</el-descriptions-item>
+              <el-descriptions-item label="采集次数">{{ selectedStrategy ? selectedStrategy.collectCount : 0 }}次</el-descriptions-item>
+              <el-descriptions-item label="关联用例集">{{ selectedStrategy ? `${selectedStrategy.testCaseSetName} (${selectedStrategy.testCaseSetVersion})` : '' }}</el-descriptions-item>
+              <el-descriptions-item label="测试用例数量">{{ selectedStrategy && selectedStrategy.testCaseList ? selectedStrategy.testCaseList.length : 0 }}个</el-descriptions-item>
+              <el-descriptions-item label="执行环境" :span="2">{{ environmentSummary }}</el-descriptions-item>
+            </el-descriptions>
+            
+            <div class="execution-options">
+              <h4>执行选项</h4>
+              <el-form-item label="执行计划" prop="schedule">
+                <el-input v-model="executionForm.schedule" placeholder="请输入Cron表达式，如：0 0 */1 * * ?" />
+              </el-form-item>
+              <el-form-item label="立即执行">
+                <el-switch v-model="executionForm.executeNow" />
+              </el-form-item>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 操作按钮 -->
       <template #footer>
         <span class="dialog-footer">
           <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="handleSubmit">确定</el-button>
+          <el-button 
+            type="success" 
+            @click="handleSubmit"
+            :loading="submitLoading"
+          >
+            创建任务
+          </el-button>
         </span>
       </template>
     </el-dialog>
@@ -132,7 +246,7 @@
 </template>
 
 <script>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@/utils/request'
 
@@ -143,8 +257,22 @@ export default {
     const tableData = ref([])
     const dialogVisible = ref(false)
     const dialogTitle = ref('')
-    const formRef = ref()
+    const submitLoading = ref(false)
+    
+    // 表单引用
+    const basicFormRef = ref()
+    const strategyFormRef = ref()
+    const environmentFormRef = ref()
+    
+    // 选项数据
     const strategyOptions = ref([])
+    const regionOptions = ref([])
+    const countryOptions = ref([])
+    const provinceOptions = ref([])
+    const cityOptions = ref([])
+    
+    // 选中的策略
+    const selectedStrategy = ref(null)
 
     const pagination = reactive({
       current: 1,
@@ -152,26 +280,48 @@ export default {
       total: 0,
     })
 
-    const form = reactive({
-      id: null,
+    // 步骤1：基本信息表单
+    const basicForm = reactive({
       name: '',
-      strategyId: null,
-      schedule: '',
       description: '',
-      status: 0,
     })
 
-    const rules = {
+    const basicRules = {
       name: [
         { required: true, message: '请输入任务名称', trigger: 'blur' },
       ],
+    }
+
+    // 步骤2：采集策略表单
+    const strategyForm = reactive({
+      strategyId: null,
+    })
+
+    const strategyRules = {
       strategyId: [
-        { required: true, message: '请选择关联策略', trigger: 'change' },
-      ],
-      schedule: [
-        { required: true, message: '请输入执行计划', trigger: 'blur' },
+        { required: true, message: '请选择采集策略', trigger: 'change' },
       ],
     }
+
+    // 步骤3：环境编排表单
+    const environmentForm = reactive({
+      regionId: null,
+      countryId: null,
+      provinceId: null,
+      cityId: null,
+    })
+
+    const environmentRules = {
+      regionId: [
+        { required: true, message: '请选择地域', trigger: 'change' },
+      ],
+    }
+
+    // 步骤4：执行表单
+    const executionForm = reactive({
+      schedule: '',
+      executeNow: false,
+    })
 
     const getStatusType = (status) => {
       const typeMap = {
@@ -190,6 +340,28 @@ export default {
       }
       return textMap[status] || '未知'
     }
+
+    // 计算属性
+    const environmentSummary = computed(() => {
+      const parts = []
+      if (environmentForm.regionId) {
+        const region = regionOptions.value.find(r => r.id === environmentForm.regionId)
+        if (region) parts.push(region.name)
+      }
+      if (environmentForm.countryId) {
+        const country = countryOptions.value.find(c => c.id === environmentForm.countryId)
+        if (country) parts.push(country.name)
+      }
+      if (environmentForm.provinceId) {
+        const province = provinceOptions.value.find(p => p.id === environmentForm.provinceId)
+        if (province) parts.push(province.name)
+      }
+      if (environmentForm.cityId) {
+        const city = cityOptions.value.find(c => c.id === environmentForm.cityId)
+        if (city) parts.push(city.name)
+      }
+      return parts.length > 0 ? parts.join(' / ') : '未配置环境'
+    })
 
     const loadData = async () => {
       loading.value = true
@@ -224,10 +396,105 @@ export default {
       }
     }
 
+    const loadRegionOptions = async () => {
+      try {
+        const res = await request({
+          url: '/region/list',
+          method: 'get',
+        })
+        regionOptions.value = res.data
+      } catch (error) {
+        console.error('加载地域数据失败:', error)
+      }
+    }
+
+    const loadCountryOptions = async (regionId) => {
+      try {
+        const res = await request({
+          url: `/region/${regionId}/countries`,
+          method: 'get',
+        })
+        countryOptions.value = res.data
+      } catch (error) {
+        console.error('加载国家数据失败:', error)
+      }
+    }
+
+    const loadProvinceOptions = async (countryId) => {
+      try {
+        const res = await request({
+          url: `/region/country/${countryId}/provinces`,
+          method: 'get',
+        })
+        provinceOptions.value = res.data
+      } catch (error) {
+        console.error('加载省份数据失败:', error)
+      }
+    }
+
+    const loadCityOptions = async (provinceId) => {
+      try {
+        const res = await request({
+          url: `/region/province/${provinceId}/cities`,
+          method: 'get',
+        })
+        cityOptions.value = res.data
+      } catch (error) {
+        console.error('加载城市数据失败:', error)
+      }
+    }
+
     const handleAdd = () => {
-      dialogTitle.value = '新增任务'
+      dialogTitle.value = '新建采集任务'
       dialogVisible.value = true
       resetForm()
+      loadRegionOptions()
+    }
+
+    // 策略选择事件处理
+    const handleStrategyChange = (strategyId) => {
+      if (strategyId) {
+        const strategy = strategyOptions.value.find(s => s.id === strategyId)
+        if (strategy) {
+          selectedStrategy.value = strategy
+        }
+      } else {
+        selectedStrategy.value = null
+      }
+    }
+
+    // 环境选择事件处理
+    const handleRegionChange = async (regionId) => {
+      environmentForm.countryId = null
+      environmentForm.provinceId = null
+      environmentForm.cityId = null
+      countryOptions.value = []
+      provinceOptions.value = []
+      cityOptions.value = []
+      
+      if (regionId) {
+        await loadCountryOptions(regionId)
+      }
+    }
+
+    const handleCountryChange = async (countryId) => {
+      environmentForm.provinceId = null
+      environmentForm.cityId = null
+      provinceOptions.value = []
+      cityOptions.value = []
+      
+      if (countryId) {
+        await loadProvinceOptions(countryId)
+      }
+    }
+
+    const handleProvinceChange = async (provinceId) => {
+      environmentForm.cityId = null
+      cityOptions.value = []
+      
+      if (provinceId) {
+        await loadCityOptions(provinceId)
+      }
     }
 
     const handleEdit = (row) => {
@@ -297,43 +564,87 @@ export default {
     }
 
     const handleSubmit = async () => {
+      submitLoading.value = true
       try {
-        await formRef.value.validate()
+        // 验证所有表单
+        await Promise.all([
+          basicFormRef.value.validate(),
+          strategyFormRef.value.validate(),
+          environmentFormRef.value.validate()
+        ])
         
-        if (form.id) {
-          await request({
-            url: `/collect-task/${form.id}`,
-            method: 'put',
-            data: form,
-          })
-          ElMessage.success('更新成功')
-        } else {
-          await request({
-            url: '/collect-task',
-            method: 'post',
-            data: form,
-          })
-          ElMessage.success('创建成功')
+        // 构建提交数据
+        const submitData = {
+          name: basicForm.name,
+          description: basicForm.description,
+          strategyId: strategyForm.strategyId,
+          schedule: executionForm.schedule,
+          executeNow: executionForm.executeNow,
+          regionId: environmentForm.regionId,
+          countryId: environmentForm.countryId,
+          provinceId: environmentForm.provinceId,
+          cityId: environmentForm.cityId,
         }
         
+        await request({
+          url: '/collect-task',
+          method: 'post',
+          data: submitData,
+        })
+        
+        ElMessage.success('任务创建成功')
         dialogVisible.value = false
         loadData()
       } catch (error) {
         console.error('提交失败:', error)
+        if (error.message) {
+          ElMessage.error(error.message)
+        } else {
+          ElMessage.error('任务创建失败')
+        }
+      } finally {
+        submitLoading.value = false
       }
     }
 
     const resetForm = () => {
-      Object.assign(form, {
-        id: null,
+      // 重置表单数据
+      Object.assign(basicForm, {
         name: '',
-        strategyId: null,
-        schedule: '',
         description: '',
-        status: 0,
       })
-      if (formRef.value) {
-        formRef.value.resetFields()
+      
+      Object.assign(strategyForm, {
+        strategyId: null,
+      })
+      
+      Object.assign(environmentForm, {
+        regionId: null,
+        countryId: null,
+        provinceId: null,
+        cityId: null,
+      })
+      
+      Object.assign(executionForm, {
+        schedule: '',
+        executeNow: false,
+      })
+      
+      // 重置选项数据
+      selectedStrategy.value = null
+      countryOptions.value = []
+      provinceOptions.value = []
+      cityOptions.value = []
+      
+      // 重置表单验证
+      if (basicFormRef.value) {
+        basicFormRef.value.resetFields()
+      }
+      if (strategyFormRef.value) {
+        strategyFormRef.value.resetFields()
+      }
+      if (environmentFormRef.value) {
+        environmentFormRef.value.resetFields()
       }
     }
 
@@ -358,13 +669,32 @@ export default {
       pagination,
       dialogVisible,
       dialogTitle,
-      formRef,
-      form,
-      rules,
+      submitLoading,
+      basicFormRef,
+      strategyFormRef,
+      environmentFormRef,
+      basicForm,
+      basicRules,
+      strategyForm,
+      strategyRules,
+      environmentForm,
+      environmentRules,
+      executionForm,
       strategyOptions,
+      regionOptions,
+      countryOptions,
+      provinceOptions,
+      cityOptions,
+      selectedStrategy,
+      environmentSummary,
       getStatusType,
       getStatusText,
       loadData,
+      loadStrategyOptions,
+      loadRegionOptions,
+      loadCountryOptions,
+      loadProvinceOptions,
+      loadCityOptions,
       handleAdd,
       handleEdit,
       handleStart,
@@ -373,6 +703,10 @@ export default {
       handleDelete,
       handleSubmit,
       resetForm,
+      handleStrategyChange,
+      handleRegionChange,
+      handleCountryChange,
+      handleProvinceChange,
       handleSizeChange,
       handleCurrentChange,
     }
@@ -396,5 +730,77 @@ export default {
 .pagination {
   margin-top: 20px;
   text-align: right;
+}
+
+/* 步骤内容样式 */
+.step-content {
+  min-height: 600px;
+}
+
+.step-panel {
+  padding: 20px 0;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.step-panel:last-child {
+  border-bottom: none;
+}
+
+.step-title {
+  margin: 0 0 20px 0;
+  color: #303133;
+  font-size: 16px;
+  font-weight: 600;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #409eff;
+}
+
+/* 策略信息样式 */
+.strategy-info {
+  margin-top: 20px;
+  padding: 16px;
+  background-color: #f5f7fa;
+  border-radius: 4px;
+}
+
+.strategy-info h4 {
+  margin: 0 0 12px 0;
+  color: #303133;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* 环境配置摘要样式 */
+.environment-summary {
+  margin-top: 20px;
+}
+
+.environment-summary h4 {
+  margin: 0 0 12px 0;
+  color: #303133;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* 执行摘要样式 */
+.execution-summary h4 {
+  margin: 0 0 16px 0;
+  color: #303133;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.execution-options {
+  margin-top: 20px;
+  padding: 16px;
+  background-color: #f5f7fa;
+  border-radius: 4px;
+}
+
+.execution-options h4 {
+  margin: 0 0 12px 0;
+  color: #303133;
+  font-size: 14px;
+  font-weight: 600;
 }
 </style>

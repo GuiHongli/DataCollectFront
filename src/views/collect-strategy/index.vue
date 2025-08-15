@@ -20,7 +20,41 @@
       <el-table :data="tableData" v-loading="loading" style="width: 100%">
         <el-table-column prop="name" label="策略名称" />
         <el-table-column prop="collectCount" label="采集次数" />
-        <el-table-column prop="logicEnvironmentName" label="逻辑环境" />
+        <el-table-column label="用例集" min-width="300">
+          <template #default="scope">
+            <div v-if="scope.row.testCaseSetName">
+              <div class="test-case-set-info">
+                <div class="set-name">
+                  <strong>{{ scope.row.testCaseSetName }} ({{ scope.row.testCaseSetVersion }})</strong>
+                </div>
+                <div class="set-description" v-if="scope.row.testCaseSetDescription">
+                  <span class="label">描述：</span>
+                  <span>{{ scope.row.testCaseSetDescription }}</span>
+                </div>
+                <div class="test-case-info" v-if="scope.row.testCaseList && scope.row.testCaseList.length > 0">
+                  <span class="label">测试用例：</span>
+                  <span v-for="(testCase, index) in scope.row.testCaseList" :key="testCase.id">
+                    {{ testCase.name }}({{ testCase.code }})
+                    <span v-if="index < scope.row.testCaseList.length - 1">, </span>
+                  </span>
+                </div>
+                <div class="file-info" v-if="scope.row.testCaseSetGohttpserverUrl">
+                  <span class="label">文件：</span>
+                  <el-link 
+                    type="primary" 
+                    :href="scope.row.testCaseSetGohttpserverUrl" 
+                    target="_blank"
+                    :underline="false"
+                  >
+                    <el-icon><Link /></el-icon>
+                    查看文件
+                  </el-link>
+                </div>
+              </div>
+            </div>
+            <span v-else style="color: #909399;">未配置</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="description" label="描述" />
         <el-table-column prop="status" label="状态">
           <template #default="scope">
@@ -76,12 +110,12 @@
             style="width: 100%"
           />
         </el-form-item>
-        <el-form-item label="逻辑环境" prop="logicEnvironmentId">
-          <el-select v-model="form.logicEnvironmentId" placeholder="请选择逻辑环境" style="width: 100%">
+        <el-form-item label="用例集" prop="testCaseSetId">
+          <el-select v-model="form.testCaseSetId" placeholder="请选择用例集" style="width: 100%">
             <el-option
-              v-for="item in logicEnvironmentOptions"
+              v-for="item in testCaseSetOptions"
               :key="item.id"
-              :label="item.name"
+              :label="`${item.name} (${item.version})`"
               :value="item.id"
             />
           </el-select>
@@ -114,6 +148,7 @@
 <script>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Link } from '@element-plus/icons-vue'
 import request from '@/utils/request'
 
 export default {
@@ -124,7 +159,7 @@ export default {
     const dialogVisible = ref(false)
     const dialogTitle = ref('')
     const formRef = ref()
-    const logicEnvironmentOptions = ref([])
+    const testCaseSetOptions = ref([])
 
     const pagination = reactive({
       current: 1,
@@ -136,7 +171,7 @@ export default {
       id: null,
       name: '',
       collectCount: 1,
-      logicEnvironmentId: null,
+      testCaseSetId: null,
       description: '',
       status: 1,
     })
@@ -148,8 +183,8 @@ export default {
       collectCount: [
         { required: true, message: '请输入采集次数', trigger: 'blur' },
       ],
-      logicEnvironmentId: [
-        { required: true, message: '请选择逻辑环境', trigger: 'change' },
+      testCaseSetId: [
+        { required: true, message: '请选择用例集', trigger: 'change' },
       ],
     }
 
@@ -174,15 +209,15 @@ export default {
       }
     }
 
-    const loadLogicEnvironmentOptions = async () => {
+    const loadTestCaseSetOptions = async () => {
       try {
         const res = await request({
-          url: '/logic-environment/list',
+          url: '/test-case-set/list',
           method: 'get',
         })
-        logicEnvironmentOptions.value = res.data
+        testCaseSetOptions.value = res.data
       } catch (error) {
-        console.error('加载逻辑环境数据失败:', error)
+        console.error('加载用例集数据失败:', error)
       }
     }
 
@@ -251,7 +286,7 @@ export default {
         id: null,
         name: '',
         collectCount: 1,
-        logicEnvironmentId: null,
+        testCaseSetId: null,
         description: '',
         status: 1,
       })
@@ -272,7 +307,7 @@ export default {
 
     onMounted(() => {
       loadData()
-      loadLogicEnvironmentOptions()
+      loadTestCaseSetOptions()
     })
 
     return {
@@ -284,8 +319,9 @@ export default {
       formRef,
       form,
       rules,
-      logicEnvironmentOptions,
+      testCaseSetOptions,
       loadData,
+      loadTestCaseSetOptions,
       handleAdd,
       handleEdit,
       handleDelete,
@@ -314,5 +350,32 @@ export default {
 .pagination {
   margin-top: 20px;
   text-align: right;
+}
+
+/* 用例集信息样式 */
+.test-case-set-info {
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.test-case-set-info .set-name {
+  margin-bottom: 4px;
+  color: #303133;
+}
+
+.test-case-set-info .set-description,
+.test-case-set-info .test-case-info,
+.test-case-set-info .file-info {
+  margin-bottom: 2px;
+  color: #606266;
+}
+
+.test-case-set-info .label {
+  font-weight: 500;
+  color: #909399;
+}
+
+.test-case-set-info .el-link {
+  font-size: 11px;
 }
 </style>

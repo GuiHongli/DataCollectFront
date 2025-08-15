@@ -18,7 +18,17 @@
       </div>
 
       <el-table :data="tableData" v-loading="loading" style="width: 100%">
-        <el-table-column prop="name" label="用例集名称" />
+        <el-table-column prop="name" label="用例集名称" min-width="150">
+          <template #default="scope">
+            <el-link 
+              type="primary" 
+              @click="handleViewDetail(scope.row)"
+              :underline="false"
+            >
+              {{ scope.row.name }}
+            </el-link>
+          </template>
+        </el-table-column>
         <el-table-column prop="version" label="版本" />
         <el-table-column prop="fileSize" label="文件大小">
           <template #default="scope">
@@ -133,6 +143,7 @@
 
 <script>
 import { ref, reactive, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Link, CopyDocument } from '@element-plus/icons-vue'
 import request from '@/utils/request'
@@ -140,6 +151,7 @@ import request from '@/utils/request'
 export default {
   name: 'TestCaseSet',
   setup() {
+    const router = useRouter()
     const loading = ref(false)
     const tableData = ref([])
     const uploadDialogVisible = ref(false)
@@ -316,6 +328,10 @@ export default {
       loadData()
     }
 
+    const handleViewDetail = (row) => {
+      router.push(`/test-case-set/detail/${row.id}`)
+    }
+
     onMounted(() => {
       loadData()
     })
@@ -341,6 +357,7 @@ export default {
       resetUploadForm,
       handleSizeChange,
       handleCurrentChange,
+      handleViewDetail,
     }
   },
 }
