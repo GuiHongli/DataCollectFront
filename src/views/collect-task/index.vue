@@ -179,7 +179,7 @@
               </el-select>
             </el-form-item>
             <el-form-item label="城市筛选" prop="cityId">
-              <el-select v-model="environmentForm.cityId" placeholder="请选择城市" style="width: 100%" :disabled="!environmentForm.provinceId">
+              <el-select v-model="environmentForm.cityId" placeholder="请选择城市" style="width: 100%" @change="handleCityChange" :disabled="!environmentForm.provinceId">
                 <el-option
                   v-for="item in cityOptions"
                   :key="item.id"
@@ -198,6 +198,63 @@
               />
             </div>
           </el-form>
+          
+          <!-- 可用逻辑环境列表 -->
+          <div v-if="selectedStrategy && (environmentForm.regionId || environmentForm.countryId || environmentForm.provinceId || environmentForm.cityId)" class="available-environments">
+            <h4>可用逻辑环境列表</h4>
+            <div v-loading="environmentsLoading" class="environments-content">
+              <div v-if="availableEnvironments.length === 0" class="no-environments">
+                <el-empty description="暂无可用的逻辑环境" />
+              </div>
+              <div v-else class="environments-list">
+                <el-card 
+                  v-for="env in availableEnvironments" 
+                  :key="env.id" 
+                  class="environment-card"
+                  shadow="hover"
+                >
+                  <div class="environment-header">
+                    <h5 class="environment-name">{{ env.name }}</h5>
+                    <el-tag :type="env.status === 1 ? 'success' : 'danger'" size="small">
+                      {{ env.status === 1 ? '可用' : '不可用' }}
+                    </el-tag>
+                  </div>
+                  <div class="environment-info">
+                    <p><strong>执行机：</strong>{{ env.executorName }} ({{ env.executorIpAddress }})</p>
+                    <p><strong>地域：</strong>{{ env.executorRegionName }}</p>
+                    <p v-if="env.description"><strong>描述：</strong>{{ env.description }}</p>
+                  </div>
+                  <div v-if="env.ueList && env.ueList.length > 0" class="environment-ue">
+                    <p><strong>UE设备：</strong></p>
+                    <div class="ue-list">
+                      <el-tag 
+                        v-for="ue in env.ueList" 
+                        :key="ue.id" 
+                        size="small" 
+                        style="margin-right: 8px; margin-bottom: 4px;"
+                      >
+                        {{ ue.name }} ({{ ue.ueId }})
+                      </el-tag>
+                    </div>
+                  </div>
+                  <div v-if="env.networkList && env.networkList.length > 0" class="environment-networks">
+                    <p><strong>环境组网：</strong></p>
+                    <div class="network-list">
+                      <el-tag 
+                        v-for="network in env.networkList" 
+                        :key="network.id" 
+                        type="info" 
+                        size="small" 
+                        style="margin-right: 8px; margin-bottom: 4px;"
+                      >
+                        {{ network.name }}
+                      </el-tag>
+                    </div>
+                  </div>
+                </el-card>
+              </div>
+            </div>
+          </div>
         </div>
 
 
@@ -248,6 +305,10 @@ export default {
     
     // 选中的策略
     const selectedStrategy = ref(null)
+    
+    // 可用逻辑环境列表
+    const availableEnvironments = ref([])
+    const environmentsLoading = ref(false)
 
     const pagination = reactive({
       current: 1,
@@ -418,6 +479,37 @@ export default {
         console.error('加载城市数据失败:', error)
       }
     }
+    
+    const loadAvailableEnvironments = async () => {
+      // 如果没有选择策略或者没有选择任何地域筛选条件，则不加载
+      if (!selectedStrategy.value || (!environmentForm.regionId && !environmentForm.countryId && !environmentForm.provinceId && !environmentForm.cityId)) {
+        availableEnvironments.value = []
+        return
+      }
+      
+      environmentsLoading.value = true
+      try {
+        const params = {
+          strategyId: selectedStrategy.value.id,
+          regionId: environmentForm.regionId,
+          countryId: environmentForm.countryId,
+          provinceId: environmentForm.provinceId,
+          cityId: environmentForm.cityId,
+        }
+        
+        const res = await request({
+          url: '/collect-task/available-logic-environments',
+          method: 'get',
+          params,
+        })
+        availableEnvironments.value = res.data
+      } catch (error) {
+        console.error('加载可用逻辑环境失败:', error)
+        availableEnvironments.value = []
+      } finally {
+        environmentsLoading.value = false
+      }
+    }
 
     const handleAdd = () => {
       dialogTitle.value = '新建采集任务'
@@ -427,14 +519,16 @@ export default {
     }
 
     // 策略选择事件处理
-    const handleStrategyChange = (strategyId) => {
+    const handleStrategyChange = async (strategyId) => {
       if (strategyId) {
         const strategy = strategyOptions.value.find(s => s.id === strategyId)
         if (strategy) {
           selectedStrategy.value = strategy
+          await loadAvailableEnvironments()
         }
       } else {
         selectedStrategy.value = null
+        availableEnvironments.value = []
       }
     }
 
@@ -450,6 +544,7 @@ export default {
       if (regionId) {
         await loadCountryOptions(regionId)
       }
+      await loadAvailableEnvironments()
     }
 
     const handleCountryChange = async (countryId) => {
@@ -461,6 +556,7 @@ export default {
       if (countryId) {
         await loadProvinceOptions(countryId)
       }
+      await loadAvailableEnvironments()
     }
 
     const handleProvinceChange = async (provinceId) => {
@@ -470,6 +566,11 @@ export default {
       if (provinceId) {
         await loadCityOptions(provinceId)
       }
+      await loadAvailableEnvironments()
+    }
+    
+    const handleCityChange = async () => {
+      await loadAvailableEnvironments()
     }
 
     const handleEdit = (row) => {
@@ -656,6 +757,8 @@ export default {
       provinceOptions,
       cityOptions,
       selectedStrategy,
+      availableEnvironments,
+      environmentsLoading,
       environmentSummary,
       getStatusType,
       getStatusText,
@@ -677,6 +780,8 @@ export default {
       handleRegionChange,
       handleCountryChange,
       handleProvinceChange,
+      handleCityChange,
+      loadAvailableEnvironments,
       handleSizeChange,
       handleCurrentChange,
     }
@@ -750,6 +855,88 @@ export default {
   color: #303133;
   font-size: 14px;
   font-weight: 600;
+}
+
+/* 可用逻辑环境列表样式 */
+.available-environments {
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 1px solid #ebeef5;
+}
+
+.available-environments h4 {
+  margin: 0 0 20px 0;
+  color: #303133;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.environments-content {
+  min-height: 200px;
+}
+
+.no-environments {
+  text-align: center;
+  padding: 40px 0;
+}
+
+.environments-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+  gap: 16px;
+}
+
+.environment-card {
+  border: 1px solid #ebeef5;
+  transition: all 0.3s ease;
+}
+
+.environment-card:hover {
+  border-color: #409eff;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+}
+
+.environment-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.environment-name {
+  margin: 0;
+  color: #303133;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.environment-info {
+  margin-bottom: 12px;
+}
+
+.environment-info p {
+  margin: 4px 0;
+  color: #606266;
+  font-size: 14px;
+}
+
+.environment-ue,
+.environment-networks {
+  margin-top: 12px;
+}
+
+.environment-ue p,
+.environment-networks p {
+  margin: 0 0 8px 0;
+  color: #606266;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.ue-list,
+.network-list {
+  display: flex;
+  flex-wrap: wrap;
 }
 
 
