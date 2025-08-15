@@ -1,0 +1,75 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
+
+#app {
+  height: 100%;
+}
+
+.page-container {
+  padding: 20px;
+  height: 100%;
+}
+
+.page-header {
+  margin-bottom: 20px;
+}
+
+.page-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 10px;
+}
+
+.page-description {
+  color: #606266;
+  font-size: 14px;
+}
+
+.table-operations {
+  margin-bottom: 16px;
+}
+
+.table-operations .el-button {
+  margin-right: 8px;
+}
+
+.form-container {
+  max-width: 600px;
+}
+
+.status-tag {
+  margin-right: 8px;
+}
+
+.status-online {
+  background-color: #67c23a;
+}
+
+.status-offline {
+  background-color: #f56c6c;
+}
+
+.status-fault {
+  background-color: #e6a23c;
+}
+
+.status-running {
+  background-color: #67c23a;
+}
+
+.status-stopped {
+  background-color: #909399;
+}
+
+.status-paused {
+  background-color: #e6a23c;
+}
