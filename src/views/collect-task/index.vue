@@ -18,7 +18,17 @@
       </div>
 
       <el-table :data="tableData" v-loading="loading" style="width: 100%">
-        <el-table-column prop="name" label="任务名称" />
+        <el-table-column prop="name" label="任务名称">
+          <template #default="scope">
+            <el-button 
+              type="text" 
+              @click="handleViewDetail(scope.row)"
+              style="color: #409eff; text-decoration: none;"
+            >
+              {{ scope.row.name }}
+            </el-button>
+          </template>
+        </el-table-column>
         <el-table-column prop="strategyName" label="关联策略" />
         <el-table-column prop="schedule" label="执行计划" />
         <el-table-column prop="status" label="状态">
@@ -294,6 +304,173 @@
         </span>
       </template>
     </el-dialog>
+
+    <!-- 任务详情对话框 -->
+    <el-dialog
+      v-model="detailDialogVisible"
+      :title="`任务详情 - ${selectedTask?.name}`"
+      width="1200px"
+      @close="closeDetailDialog"
+    >
+      <div v-if="selectedTask" class="task-detail">
+        <!-- 基本信息 -->
+        <el-card class="detail-card">
+          <template #header>
+            <div class="card-header">
+              <span>基本信息</span>
+            </div>
+          </template>
+          <el-descriptions :column="2" border>
+            <el-descriptions-item label="任务名称">{{ selectedTask.name }}</el-descriptions-item>
+            <el-descriptions-item label="任务状态">
+              <el-tag :type="getStatusType(selectedTask.status)">
+                {{ getStatusText(selectedTask.status) }}
+              </el-tag>
+            </el-descriptions-item>
+            <el-descriptions-item label="关联策略">{{ selectedTask.strategyName }}</el-descriptions-item>
+            <el-descriptions-item label="执行计划">{{ selectedTask.schedule || '立即执行' }}</el-descriptions-item>
+            <el-descriptions-item label="创建时间">{{ selectedTask.createTime }}</el-descriptions-item>
+            <el-descriptions-item label="上次运行时间">{{ selectedTask.lastRunTime || '未运行' }}</el-descriptions-item>
+            <el-descriptions-item label="下次运行时间">{{ selectedTask.nextRunTime || '无' }}</el-descriptions-item>
+            <el-descriptions-item label="任务描述">{{ selectedTask.description || '无' }}</el-descriptions-item>
+          </el-descriptions>
+        </el-card>
+
+        <!-- 执行进度 -->
+        <el-card class="detail-card">
+          <template #header>
+            <div class="card-header">
+              <span>执行进度</span>
+              <el-button size="small" @click="refreshTaskProgress">刷新</el-button>
+            </div>
+          </template>
+          <div class="progress-section">
+            <div class="progress-overview">
+              <el-row :gutter="20">
+                <el-col :span="6">
+                  <div class="progress-item">
+                    <div class="progress-number">{{ taskProgress.totalCount || 0 }}</div>
+                    <div class="progress-label">总用例数</div>
+                  </div>
+                </el-col>
+                <el-col :span="6">
+                  <div class="progress-item">
+                    <div class="progress-number success">{{ taskProgress.successCount || 0 }}</div>
+                    <div class="progress-label">成功用例数</div>
+                  </div>
+                </el-col>
+                <el-col :span="6">
+                  <div class="progress-item">
+                    <div class="progress-number warning">{{ taskProgress.failedCount || 0 }}</div>
+                    <div class="progress-label">失败用例数</div>
+                  </div>
+                </el-col>
+                <el-col :span="6">
+                  <div class="progress-item">
+                    <div class="progress-number info">{{ taskProgress.runningCount || 0 }}</div>
+                    <div class="progress-label">执行中用例数</div>
+                  </div>
+                </el-col>
+              </el-row>
+            </div>
+            
+            <div class="progress-bar-section">
+              <div class="progress-bar-label">
+                执行进度: {{ getProgressPercentage() }}%
+              </div>
+              <el-progress 
+                :percentage="getProgressPercentage()" 
+                :status="getProgressStatus()"
+                :stroke-width="20"
+              />
+            </div>
+          </div>
+        </el-card>
+
+        <!-- 执行结果统计 -->
+        <el-card class="detail-card">
+          <template #header>
+            <div class="card-header">
+              <span>执行结果统计</span>
+            </div>
+          </template>
+          <div class="statistics-section">
+            <el-row :gutter="20">
+              <el-col :span="8">
+                <div class="stat-card success">
+                  <div class="stat-icon">✓</div>
+                  <div class="stat-content">
+                    <div class="stat-number">{{ taskProgress.successCount || 0 }}</div>
+                    <div class="stat-label">成功执行</div>
+                  </div>
+                </div>
+              </el-col>
+              <el-col :span="8">
+                <div class="stat-card danger">
+                  <div class="stat-icon">✗</div>
+                  <div class="stat-content">
+                    <div class="stat-number">{{ taskProgress.failedCount || 0 }}</div>
+                    <div class="stat-label">执行失败</div>
+                  </div>
+                </div>
+              </el-col>
+              <el-col :span="8">
+                <div class="stat-card info">
+                  <div class="stat-icon">⏳</div>
+                  <div class="stat-content">
+                    <div class="stat-number">{{ taskProgress.runningCount || 0 }}</div>
+                    <div class="stat-label">执行中</div>
+                  </div>
+                </div>
+              </el-col>
+            </el-row>
+          </div>
+        </el-card>
+
+        <!-- 用例例次执行信息 -->
+        <el-card class="detail-card">
+          <template #header>
+            <div class="card-header">
+              <span>用例例次执行信息</span>
+              <el-button size="small" @click="refreshExecutionInstances">刷新</el-button>
+            </div>
+          </template>
+          <div class="instances-section">
+            <el-table :data="executionInstances" v-loading="instancesLoading" style="width: 100%">
+              <el-table-column prop="testCaseId" label="用例ID" width="100" />
+              <el-table-column prop="testCaseNumber" label="用例编号" width="120" />
+              <el-table-column prop="testCaseName" label="用例名称" />
+              <el-table-column prop="round" label="轮次" width="80" />
+              <el-table-column prop="logicEnvironmentName" label="逻辑环境" width="150" />
+              <el-table-column prop="executorIp" label="执行机IP" width="120" />
+              <el-table-column prop="status" label="状态" width="100">
+                <template #default="scope">
+                  <el-tag :type="getInstanceStatusType(scope.row.status)">
+                    {{ getInstanceStatusText(scope.row.status) }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="executionTaskId" label="执行任务ID" width="200" />
+              <el-table-column prop="createTime" label="创建时间" width="160" />
+              <el-table-column prop="updateTime" label="更新时间" width="160" />
+              <el-table-column label="操作" width="120">
+                <template #default="scope">
+                  <el-button 
+                    v-if="scope.row.executionTaskId" 
+                    type="text" 
+                    size="small"
+                    @click="viewInstanceResult(scope.row)"
+                  >
+                    查看详情
+                  </el-button>
+                  <span v-else>-</span>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
+        </el-card>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -310,6 +487,13 @@ export default {
     const dialogVisible = ref(false)
     const dialogTitle = ref('')
     const submitLoading = ref(false)
+    
+    // 任务详情相关
+    const detailDialogVisible = ref(false)
+    const selectedTask = ref(null)
+    const taskProgress = ref({})
+    const executionInstances = ref([])
+    const instancesLoading = ref(false)
     
     // 表单引用
     const basicFormRef = ref()
@@ -791,6 +975,103 @@ export default {
       loadData()
     }
 
+    // 任务详情相关方法
+    const handleViewDetail = async (row) => {
+      selectedTask.value = row
+      detailDialogVisible.value = true
+      await loadTaskProgress(row.id)
+      await loadExecutionInstances(row.id)
+    }
+
+    const closeDetailDialog = () => {
+      detailDialogVisible.value = false
+      selectedTask.value = null
+      taskProgress.value = {}
+      executionInstances.value = []
+    }
+
+    const loadTaskProgress = async (taskId) => {
+      try {
+        const res = await request({
+          url: `/collect-task/${taskId}/progress`,
+          method: 'get',
+        })
+        taskProgress.value = res.data
+      } catch (error) {
+        console.error('加载任务进度失败:', error)
+        taskProgress.value = {}
+      }
+    }
+
+    const loadExecutionInstances = async (taskId) => {
+      instancesLoading.value = true
+      try {
+        const res = await request({
+          url: `/collect-task/${taskId}/execution-instances`,
+          method: 'get',
+        })
+        executionInstances.value = res.data
+      } catch (error) {
+        console.error('加载执行例次失败:', error)
+        executionInstances.value = []
+      } finally {
+        instancesLoading.value = false
+      }
+    }
+
+    const refreshTaskProgress = async () => {
+      if (selectedTask.value) {
+        await loadTaskProgress(selectedTask.value.id)
+      }
+    }
+
+    const refreshExecutionInstances = async () => {
+      if (selectedTask.value) {
+        await loadExecutionInstances(selectedTask.value.id)
+      }
+    }
+
+    const getProgressPercentage = () => {
+      const total = taskProgress.value.totalCount || 0
+      const completed = (taskProgress.value.successCount || 0) + (taskProgress.value.failedCount || 0)
+      return total > 0 ? Math.round((completed / total) * 100) : 0
+    }
+
+    const getProgressStatus = () => {
+      const percentage = getProgressPercentage()
+      if (percentage === 100) {
+        return taskProgress.value.failedCount > 0 ? 'exception' : 'success'
+      }
+      return ''
+    }
+
+    const getInstanceStatusType = (status) => {
+      const typeMap = {
+        'PENDING': 'info',
+        'RUNNING': 'warning',
+        'COMPLETED': 'success',
+        'FAILED': 'danger',
+        'STOPPED': 'info',
+      }
+      return typeMap[status] || 'info'
+    }
+
+    const getInstanceStatusText = (status) => {
+      const textMap = {
+        'PENDING': '待执行',
+        'RUNNING': '执行中',
+        'COMPLETED': '已完成',
+        'FAILED': '执行失败',
+        'STOPPED': '已停止',
+      }
+      return textMap[status] || '未知'
+    }
+
+    const viewInstanceResult = (instance) => {
+      // 这里可以打开一个新的对话框显示执行结果详情
+      ElMessage.info(`查看用例 ${instance.testCaseNumber} 第 ${instance.round} 轮执行详情，执行任务ID: ${instance.executionTaskId}`)
+    }
+
     onMounted(() => {
       loadData()
       loadStrategyOptions()
@@ -849,6 +1130,22 @@ export default {
       handleEnvironmentSelection,
       handleSizeChange,
       handleCurrentChange,
+      
+      // 任务详情相关
+      detailDialogVisible,
+      selectedTask,
+      taskProgress,
+      executionInstances,
+      instancesLoading,
+      handleViewDetail,
+      closeDetailDialog,
+      refreshTaskProgress,
+      refreshExecutionInstances,
+      getProgressPercentage,
+      getProgressStatus,
+      getInstanceStatusType,
+      getInstanceStatusText,
+      viewInstanceResult,
     }
   },
 }
@@ -1020,5 +1317,182 @@ export default {
   margin-top: 16px;
 }
 
+/* 任务详情样式 */
+.task-detail {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.detail-card {
+  margin-bottom: 20px;
+}
+
+.detail-card:last-child {
+  margin-bottom: 0;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.card-header span {
+  font-weight: 600;
+  color: #303133;
+}
+
+/* 进度部分样式 */
+.progress-section {
+  padding: 20px 0;
+}
+
+.progress-overview {
+  margin-bottom: 30px;
+}
+
+.progress-item {
+  text-align: center;
+  padding: 20px;
+  background-color: #f5f7fa;
+  border-radius: 8px;
+  border: 1px solid #e4e7ed;
+}
+
+.progress-number {
+  font-size: 32px;
+  font-weight: bold;
+  color: #303133;
+  margin-bottom: 8px;
+}
+
+.progress-number.success {
+  color: #67c23a;
+}
+
+.progress-number.warning {
+  color: #e6a23c;
+}
+
+.progress-number.info {
+  color: #409eff;
+}
+
+.progress-label {
+  font-size: 14px;
+  color: #606266;
+}
+
+.progress-bar-section {
+  margin-top: 20px;
+}
+
+.progress-bar-label {
+  margin-bottom: 10px;
+  font-weight: 500;
+  color: #303133;
+}
+
+/* 统计卡片样式 */
+.statistics-section {
+  padding: 20px 0;
+}
+
+.stat-card {
+  display: flex;
+  align-items: center;
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid #e4e7ed;
+  background-color: #f5f7fa;
+}
+
+.stat-card.success {
+  border-color: #67c23a;
+  background-color: #f0f9ff;
+}
+
+.stat-card.danger {
+  border-color: #f56c6c;
+  background-color: #fef0f0;
+}
+
+.stat-card.info {
+  border-color: #409eff;
+  background-color: #f0f9ff;
+}
+
+.stat-icon {
+  font-size: 24px;
+  margin-right: 16px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background-color: #fff;
+}
+
+.stat-card.success .stat-icon {
+  color: #67c23a;
+}
+
+.stat-card.danger .stat-icon {
+  color: #f56c6c;
+}
+
+.stat-card.info .stat-icon {
+  color: #409eff;
+}
+
+.stat-content {
+  flex: 1;
+}
+
+.stat-number {
+  font-size: 24px;
+  font-weight: bold;
+  color: #303133;
+  margin-bottom: 4px;
+}
+
+.stat-label {
+  font-size: 14px;
+  color: #606266;
+}
+
+/* 执行例次表格样式 */
+.instances-section {
+  padding: 20px 0;
+}
+
+.instances-section .el-table {
+  margin-top: 10px;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .progress-overview .el-col {
+    margin-bottom: 16px;
+  }
+  
+  .statistics-section .el-col {
+    margin-bottom: 16px;
+  }
+  
+  .progress-item,
+  .stat-card {
+    padding: 16px;
+  }
+  
+  .progress-number {
+    font-size: 24px;
+  }
+  
+  .stat-number {
+    font-size: 20px;
+  }
+}
 
 </style>
