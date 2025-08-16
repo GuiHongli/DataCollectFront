@@ -34,7 +34,7 @@
                 <div class="test-case-info" v-if="scope.row.testCaseList && scope.row.testCaseList.length > 0">
                   <span class="label">测试用例：</span>
                   <span v-for="(testCase, index) in scope.row.testCaseList" :key="testCase.id">
-                    {{ testCase.name }}({{ testCase.code }})
+                    {{ testCase.name }}({{ testCase.number }})
                     <span v-if="index < scope.row.testCaseList.length - 1">, </span>
                   </span>
                 </div>

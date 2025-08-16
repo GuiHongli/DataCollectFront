@@ -218,7 +218,13 @@ export default {
 
     const handleEdit = (row) => {
       dialogTitle.value = '编辑执行机'
-      Object.assign(form, row)
+      // 正确映射字段，确保字段名称一致
+      form.id = row.id
+      form.name = row.name
+      form.ipAddress = row.ipAddress
+      form.regionId = row.regionId
+      form.description = row.description
+      form.status = row.status
       dialogVisible.value = true
     }
 

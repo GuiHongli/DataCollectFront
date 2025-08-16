@@ -38,7 +38,7 @@
               size="small" 
               type="success" 
               @click="handleStart(scope.row)"
-              :disabled="scope.row.status === 1"
+              :disabled="scope.row.status === 'RUNNING' || scope.row.status === 'COMPLETED'"
             >
               启动
             </el-button>
@@ -46,7 +46,7 @@
               size="small" 
               type="warning" 
               @click="handlePause(scope.row)"
-              :disabled="scope.row.status !== 1"
+              :disabled="scope.row.status !== 'RUNNING'"
             >
               暂停
             </el-button>
@@ -54,7 +54,7 @@
               size="small" 
               type="danger" 
               @click="handleStop(scope.row)"
-              :disabled="scope.row.status === 0"
+              :disabled="scope.row.status === 'STOPPED' || scope.row.status === 'COMPLETED'"
             >
               停止
             </el-button>
@@ -212,12 +212,22 @@
                   :key="env.id" 
                   class="environment-card"
                   shadow="hover"
+                  :class="{ 'selected': selectedEnvironmentIds.includes(env.id) }"
+                  @click="toggleEnvironmentSelection(env.id)"
                 >
                   <div class="environment-header">
                     <h5 class="environment-name">{{ env.name }}</h5>
-                    <el-tag :type="env.status === 1 ? 'success' : 'danger'" size="small">
-                      {{ env.status === 1 ? '可用' : '不可用' }}
-                    </el-tag>
+                    <div class="environment-status">
+                      <el-tag :type="env.status === 1 ? 'success' : 'danger'" size="small">
+                        {{ env.status === 1 ? '可用' : '不可用' }}
+                      </el-tag>
+                      <el-checkbox 
+                        v-model="selectedEnvironmentIds" 
+                        :value="env.id"
+                        @change="handleEnvironmentSelection"
+                        style="margin-left: 8px;"
+                      />
+                    </div>
                   </div>
                   <div class="environment-info">
                     <p><strong>执行机：</strong>{{ env.executorName }} ({{ env.executorIpAddress }})</p>
@@ -253,6 +263,16 @@
                   </div>
                 </el-card>
               </div>
+            </div>
+            
+            <!-- 选择提示 -->
+            <div v-if="availableEnvironments.length > 0" class="selection-tip">
+              <el-alert
+                :title="`已选择 ${selectedEnvironmentIds.length} 个逻辑环境`"
+                type="info"
+                :closable="false"
+                show-icon
+              />
             </div>
           </div>
         </div>
@@ -309,6 +329,9 @@ export default {
     // 可用逻辑环境列表
     const availableEnvironments = ref([])
     const environmentsLoading = ref(false)
+    
+    // 选中的逻辑环境ID列表
+    const selectedEnvironmentIds = ref([])
 
     const pagination = reactive({
       current: 1,
@@ -352,23 +375,38 @@ export default {
         { required: true, message: '请选择地域', trigger: 'change' },
       ],
     }
+    
+    // 逻辑环境选择验证
+    const validateEnvironmentSelection = () => {
+      if (selectedEnvironmentIds.value.length === 0) {
+        ElMessage.error('请至少选择一个逻辑环境')
+        return false
+      }
+      return true
+    }
 
 
 
     const getStatusType = (status) => {
       const typeMap = {
-        0: 'info',
-        1: 'success',
-        2: 'warning',
+        'PENDING': 'info',
+        'RUNNING': 'success',
+        'COMPLETED': 'success',
+        'FAILED': 'danger',
+        'STOPPED': 'info',
+        'PAUSED': 'warning',
       }
       return typeMap[status] || 'info'
     }
 
     const getStatusText = (status) => {
       const textMap = {
-        0: '停止',
-        1: '运行中',
-        2: '暂停',
+        'PENDING': '待执行',
+        'RUNNING': '运行中',
+        'COMPLETED': '已完成',
+        'FAILED': '执行失败',
+        'STOPPED': '已停止',
+        'PAUSED': '已暂停',
       }
       return textMap[status] || '未知'
     }
@@ -572,6 +610,21 @@ export default {
     const handleCityChange = async () => {
       await loadAvailableEnvironments()
     }
+    
+    // 切换逻辑环境选择
+    const toggleEnvironmentSelection = (environmentId) => {
+      const index = selectedEnvironmentIds.value.indexOf(environmentId)
+      if (index > -1) {
+        selectedEnvironmentIds.value.splice(index, 1)
+      } else {
+        selectedEnvironmentIds.value.push(environmentId)
+      }
+    }
+    
+    // 处理逻辑环境选择变化
+    const handleEnvironmentSelection = () => {
+      // 这里可以添加选择变化时的逻辑
+    }
 
     const handleEdit = (row) => {
       dialogTitle.value = '编辑任务'
@@ -649,19 +702,26 @@ export default {
           environmentFormRef.value.validate()
         ])
         
+        // 验证逻辑环境选择
+        if (!validateEnvironmentSelection()) {
+          return
+        }
+        
         // 构建提交数据
         const submitData = {
           name: basicForm.name,
           description: basicForm.description,
-          strategyId: strategyForm.strategyId,
+          collectStrategyId: strategyForm.strategyId,
+          collectCount: selectedStrategy.value ? selectedStrategy.value.collectCount : 1,
           regionId: environmentForm.regionId,
           countryId: environmentForm.countryId,
           provinceId: environmentForm.provinceId,
           cityId: environmentForm.cityId,
+          logicEnvironmentIds: selectedEnvironmentIds.value,
         }
         
         await request({
-          url: '/collect-task',
+          url: '/collect-task/create',
           method: 'post',
           data: submitData,
         })
@@ -699,13 +759,15 @@ export default {
         cityId: null,
       })
       
-
-      
       // 重置选项数据
       selectedStrategy.value = null
       countryOptions.value = []
       provinceOptions.value = []
       cityOptions.value = []
+      
+      // 重置逻辑环境选择
+      selectedEnvironmentIds.value = []
+      availableEnvironments.value = []
       
       // 重置表单验证
       if (basicFormRef.value) {
@@ -759,6 +821,7 @@ export default {
       selectedStrategy,
       availableEnvironments,
       environmentsLoading,
+      selectedEnvironmentIds,
       environmentSummary,
       getStatusType,
       getStatusText,
@@ -782,6 +845,8 @@ export default {
       handleProvinceChange,
       handleCityChange,
       loadAvailableEnvironments,
+      toggleEnvironmentSelection,
+      handleEnvironmentSelection,
       handleSizeChange,
       handleCurrentChange,
     }
@@ -889,6 +954,7 @@ export default {
 .environment-card {
   border: 1px solid #ebeef5;
   transition: all 0.3s ease;
+  cursor: pointer;
 }
 
 .environment-card:hover {
@@ -896,11 +962,22 @@ export default {
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
 }
 
+.environment-card.selected {
+  border-color: #67c23a;
+  background-color: #f0f9ff;
+  box-shadow: 0 2px 12px 0 rgba(103, 194, 58, 0.2);
+}
+
 .environment-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 12px;
+}
+
+.environment-status {
+  display: flex;
+  align-items: center;
 }
 
 .environment-name {
@@ -937,6 +1014,10 @@ export default {
 .network-list {
   display: flex;
   flex-wrap: wrap;
+}
+
+.selection-tip {
+  margin-top: 16px;
 }
 
 

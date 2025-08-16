@@ -67,7 +67,7 @@
 
       <el-table :data="testCases" v-loading="loading" style="width: 100%">
         <el-table-column prop="name" label="用例名称" min-width="150" />
-        <el-table-column prop="code" label="用例编号" width="100" />
+        <el-table-column prop="number" label="用例编号" width="100" />
         <el-table-column prop="logicNetwork" label="逻辑组网" min-width="150">
           <template #default="scope">
             <div v-if="scope.row.logicNetwork">
