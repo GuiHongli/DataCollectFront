@@ -493,7 +493,23 @@ export default {
     const handleEdit = (row) => {
       dialogTitle.value = '编辑逻辑环境'
       Object.assign(form, row)
+      
+      // 处理UE回显：将ueList中的UE ID提取到selectedUeIds
+      if (row.ueList && row.ueList.length > 0) {
+        form.selectedUeIds = row.ueList.map(ue => ue.id)
+      } else {
+        form.selectedUeIds = []
+      }
+      
+      // 处理逻辑组网回显：将networkList中的网络ID提取到selectedNetworkIds
+      if (row.networkList && row.networkList.length > 0) {
+        form.selectedNetworkIds = row.networkList.map(network => network.id)
+      } else {
+        form.selectedNetworkIds = []
+      }
+      
       dialogVisible.value = true
+      loadExecutorOptions()
       loadUeOptions()
       loadNetworkOptions()
     }
@@ -524,11 +540,22 @@ export default {
         await formRef.value.validate()
         
         if (form.id) {
-          // 编辑逻辑环境
+          // 编辑逻辑环境，同时更新UE和逻辑组网关联
+          const requestData = {
+            logicEnvironment: {
+              name: form.name,
+              executorId: form.executorId,
+              description: form.description,
+              status: form.status,
+            },
+            ueIds: form.selectedUeIds,
+            networkIds: form.selectedNetworkIds,
+          }
+          
           await request({
-            url: `/logic-environment/${form.id}`,
+            url: `/logic-environment/${form.id}/with-ue-and-network`,
             method: 'put',
-            data: form,
+            data: requestData,
           })
           ElMessage.success('更新成功')
         } else {
