@@ -22,13 +22,6 @@
         <el-table-column prop="ipAddress" label="IP地址" />
         <el-table-column prop="regionName" label="所属地域" />
         <el-table-column prop="description" label="描述" />
-        <el-table-column prop="status" label="状态">
-          <template #default="scope">
-            <el-tag :type="getStatusType(scope.row.status)">
-              {{ getStatusText(scope.row.status) }}
-            </el-tag>
-          </template>
-        </el-table-column>
         <el-table-column prop="createTime" label="创建时间" />
         <el-table-column label="操作" width="200">
           <template #default="scope">
@@ -99,13 +92,6 @@
             placeholder="请输入描述"
           />
         </el-form-item>
-        <el-form-item label="状态" prop="status">
-          <el-radio-group v-model="form.status">
-            <el-radio :label="1">在线</el-radio>
-            <el-radio :label="0">离线</el-radio>
-            <el-radio :label="2">故障</el-radio>
-          </el-radio-group>
-        </el-form-item>
       </el-form>
       <template #footer>
         <span class="dialog-footer">
@@ -144,7 +130,6 @@ export default {
       ipAddress: '',
       regionId: null,
       description: '',
-      status: 1,
     })
 
     const rules = {
@@ -159,23 +144,7 @@ export default {
       ],
     }
 
-    const getStatusType = (status) => {
-      const typeMap = {
-        0: 'danger',
-        1: 'success',
-        2: 'warning',
-      }
-      return typeMap[status] || 'info'
-    }
 
-    const getStatusText = (status) => {
-      const textMap = {
-        0: '离线',
-        1: '在线',
-        2: '故障',
-      }
-      return textMap[status] || '未知'
-    }
 
     const loadData = async () => {
       loading.value = true
@@ -224,7 +193,6 @@ export default {
       form.ipAddress = row.ipAddress
       form.regionId = row.regionId
       form.description = row.description
-      form.status = row.status
       dialogVisible.value = true
     }
 
@@ -283,7 +251,6 @@ export default {
         ipAddress: '',
         regionId: null,
         description: '',
-        status: 1,
       })
       if (formRef.value) {
         formRef.value.resetFields()
@@ -315,8 +282,6 @@ export default {
       form,
       rules,
       regionOptions,
-      getStatusType,
-      getStatusText,
       loadData,
       handleAdd,
       handleEdit,

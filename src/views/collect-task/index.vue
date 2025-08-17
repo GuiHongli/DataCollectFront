@@ -18,6 +18,7 @@
       </div>
 
       <el-table :data="tableData" v-loading="loading" style="width: 100%">
+        <el-table-column prop="id" label="任务ID" width="80" />
         <el-table-column prop="name" label="任务名称">
           <template #default="scope">
             <el-button 
@@ -38,12 +39,21 @@
             </el-tag>
           </template>
         </el-table-column>
+        <el-table-column prop="failureReason" label="失败原因" width="200">
+          <template #default="scope">
+            <div v-if="scope.row.status === 'FAILED' && scope.row.failureReason">
+              <el-tooltip :content="scope.row.failureReason" placement="top" :show-after="500">
+                <span class="failure-reason-text">{{ scope.row.failureReason }}</span>
+              </el-tooltip>
+            </div>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="lastRunTime" label="上次运行时间" />
         <el-table-column prop="nextRunTime" label="下次运行时间" />
         <el-table-column prop="createTime" label="创建时间" />
-        <el-table-column label="操作" width="300">
+        <el-table-column label="操作" width="200">
           <template #default="scope">
-            <el-button size="small" @click="handleEdit(scope.row)">编辑</el-button>
             <el-button 
               size="small" 
               type="success" 
@@ -51,14 +61,6 @@
               :disabled="scope.row.status === 'RUNNING' || scope.row.status === 'COMPLETED'"
             >
               启动
-            </el-button>
-            <el-button 
-              size="small" 
-              type="warning" 
-              @click="handlePause(scope.row)"
-              :disabled="scope.row.status !== 'RUNNING'"
-            >
-              暂停
             </el-button>
             <el-button 
               size="small" 
@@ -321,6 +323,7 @@
             </div>
           </template>
           <el-descriptions :column="2" border>
+            <el-descriptions-item label="任务ID">{{ selectedTask.id }}</el-descriptions-item>
             <el-descriptions-item label="任务名称">{{ selectedTask.name }}</el-descriptions-item>
             <el-descriptions-item label="任务状态">
               <el-tag :type="getStatusType(selectedTask.status)">
@@ -333,6 +336,15 @@
             <el-descriptions-item label="上次运行时间">{{ selectedTask.lastRunTime || '未运行' }}</el-descriptions-item>
             <el-descriptions-item label="下次运行时间">{{ selectedTask.nextRunTime || '无' }}</el-descriptions-item>
             <el-descriptions-item label="任务描述">{{ selectedTask.description || '无' }}</el-descriptions-item>
+            <el-descriptions-item v-if="selectedTask.status === 'FAILED' && selectedTask.failureReason" label="失败原因">
+              <el-alert
+                :title="selectedTask.failureReason"
+                type="error"
+                :closable="false"
+                show-icon
+                style="margin: 0;"
+              />
+            </el-descriptions-item>
           </el-descriptions>
         </el-card>
 
@@ -443,11 +455,29 @@
               <el-table-column prop="round" label="轮次" width="80" />
               <el-table-column prop="logicEnvironmentName" label="逻辑环境" width="150" />
               <el-table-column prop="executorIp" label="执行机IP" width="120" />
-              <el-table-column prop="status" label="状态" width="100">
+              <el-table-column prop="status" label="执行状态" width="100">
                 <template #default="scope">
                   <el-tag :type="getInstanceStatusType(scope.row.status)">
                     {{ getInstanceStatusText(scope.row.status) }}
                   </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="result" label="执行结果" width="100">
+                <template #default="scope">
+                  <el-tag v-if="scope.row.result" :type="getInstanceResultType(scope.row.result)">
+                    {{ getInstanceResultText(scope.row.result) }}
+                  </el-tag>
+                  <span v-else>-</span>
+                </template>
+              </el-table-column>
+              <el-table-column prop="failureReason" label="失败原因" width="200">
+                <template #default="scope">
+                  <div v-if="scope.row.failureReason">
+                    <el-tooltip :content="scope.row.failureReason" placement="top" :show-after="500">
+                      <span class="failure-reason-text">{{ scope.row.failureReason }}</span>
+                    </el-tooltip>
+                  </div>
+                  <span v-else>-</span>
                 </template>
               </el-table-column>
               <el-table-column prop="executionTaskId" label="执行任务ID" width="200" />
@@ -810,12 +840,6 @@ export default {
       // 这里可以添加选择变化时的逻辑
     }
 
-    const handleEdit = (row) => {
-      dialogTitle.value = '编辑任务'
-      Object.assign(form, row)
-      dialogVisible.value = true
-    }
-
     const handleStart = async (row) => {
       try {
         await request({
@@ -839,19 +863,6 @@ export default {
         loadData()
       } catch (error) {
         ElMessage.error('停止失败')
-      }
-    }
-
-    const handlePause = async (row) => {
-      try {
-        await request({
-          url: `/collect-task/${row.id}/pause`,
-          method: 'post',
-        })
-        ElMessage.success('暂停成功')
-        loadData()
-      } catch (error) {
-        ElMessage.error('暂停失败')
       }
     }
 
@@ -1067,6 +1078,24 @@ export default {
       return textMap[status] || '未知'
     }
 
+    const getInstanceResultType = (result) => {
+      const typeMap = {
+        'SUCCESS': 'success',
+        'FAILED': 'danger',
+        'BLOCKED': 'warning',
+      }
+      return typeMap[result] || 'info'
+    }
+
+    const getInstanceResultText = (result) => {
+      const textMap = {
+        'SUCCESS': '成功',
+        'FAILED': '失败',
+        'BLOCKED': '阻塞',
+      }
+      return textMap[result] || '未知'
+    }
+
     const viewInstanceResult = (instance) => {
       // 这里可以打开一个新的对话框显示执行结果详情
       ElMessage.info(`查看用例 ${instance.testCaseNumber} 第 ${instance.round} 轮执行详情，执行任务ID: ${instance.executionTaskId}`)
@@ -1113,10 +1142,8 @@ export default {
       loadProvinceOptions,
       loadCityOptions,
       handleAdd,
-      handleEdit,
       handleStart,
       handleStop,
-      handlePause,
       handleDelete,
       handleSubmit,
       resetForm,
@@ -1145,6 +1172,8 @@ export default {
       getProgressStatus,
       getInstanceStatusType,
       getInstanceStatusText,
+      getInstanceResultType,
+      getInstanceResultText,
       viewInstanceResult,
     }
   },
@@ -1469,6 +1498,18 @@ export default {
 
 .instances-section .el-table {
   margin-top: 10px;
+}
+
+/* 失败原因文本样式 */
+.failure-reason-text {
+  color: #f56c6c;
+  font-size: 12px;
+  cursor: pointer;
+  display: inline-block;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* 响应式设计 */
