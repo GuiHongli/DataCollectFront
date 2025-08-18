@@ -221,6 +221,25 @@
                         <span v-else>-</span>
                       </template>
                     </el-table-column>
+                    <el-table-column prop="logFilePath" label="日志文件" width="200">
+                      <template #default="scope">
+                        <div v-if="scope.row.logFilePath">
+                          <el-tooltip :content="scope.row.logFilePath" placement="top" :show-after="500">
+                            <el-link 
+                              v-if="scope.row.logFilePath.startsWith('http')" 
+                              type="primary" 
+                              :href="scope.row.logFilePath" 
+                              target="_blank"
+                              :underline="false"
+                            >
+                              查看日志
+                            </el-link>
+                            <span v-else class="log-file-path">{{ scope.row.logFilePath }}</span>
+                          </el-tooltip>
+                        </div>
+                        <span v-else>-</span>
+                      </template>
+                    </el-table-column>
                     <el-table-column prop="executionTaskId" label="执行任务ID" width="200" />
                     <el-table-column prop="createTime" label="创建时间" width="160" />
                     <el-table-column prop="updateTime" label="更新时间" width="160" />
@@ -2030,6 +2049,19 @@ export default {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* 日志文件路径样式 */
+.log-file-path {
+  color: #606266;
+  font-size: 12px;
+  cursor: pointer;
+  display: inline-block;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: 'Courier New', monospace;
 }
 
 </style>
