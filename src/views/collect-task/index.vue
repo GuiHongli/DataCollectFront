@@ -2,22 +2,27 @@
   <div class="collect-task-page">
     <div class="page-header">
       <h2 class="page-title">采集任务管理</h2>
-      <p class="page-description">管理采集任务，支持任务的启动、停止、暂停等操作</p>
+      <p class="page-description">管理采集任务，支持任务的停止、删除等操作</p>
     </div>
 
-    <el-card>
-      <div class="table-operations">
-        <el-button type="primary" @click="handleAdd">
-          <el-icon><Plus /></el-icon>
-          新增任务
-        </el-button>
-        <el-button @click="loadData">
-          <el-icon><Refresh /></el-icon>
-          刷新
-        </el-button>
-      </div>
+    <!-- 主内容区域 -->
+    <div class="main-content">
+      <el-card>
+        <!-- Tab切换 -->
+        <el-tabs v-model="activeTab" @tab-click="handleTabClick" @tab-remove="handleTabRemove">
+          <el-tab-pane label="任务列表" name="list">
+            <div class="table-operations">
+              <el-button type="primary" @click="handleAdd">
+                <el-icon><Plus /></el-icon>
+                新增任务
+              </el-button>
+              <el-button @click="refreshAllData" :loading="loading">
+                <el-icon><Refresh /></el-icon>
+                刷新
+              </el-button>
+            </div>
 
-      <el-table :data="tableData" v-loading="loading" style="width: 100%">
+            <el-table :data="tableData" v-loading="loading" style="width: 100%">
         <el-table-column prop="id" label="任务ID" width="80" />
         <el-table-column prop="name" label="任务名称">
           <template #default="scope">
@@ -30,8 +35,6 @@
             </el-button>
           </template>
         </el-table-column>
-        <el-table-column prop="strategyName" label="关联策略" />
-        <el-table-column prop="schedule" label="执行计划" />
         <el-table-column prop="status" label="状态">
           <template #default="scope">
             <el-tag :type="getStatusType(scope.row.status)">
@@ -39,29 +42,26 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="failureReason" label="失败原因" width="200">
+        <el-table-column label="执行进度" width="200">
           <template #default="scope">
-            <div v-if="scope.row.status === 'FAILED' && scope.row.failureReason">
-              <el-tooltip :content="scope.row.failureReason" placement="top" :show-after="500">
-                <span class="failure-reason-text">{{ scope.row.failureReason }}</span>
-              </el-tooltip>
+            <div class="progress-display">
+              <div class="progress-info">
+                <span class="progress-text">{{ getTableProgressText(scope.row) }}</span>
+                <span class="progress-percentage">{{ getTableProgressPercentage(scope.row) }}%</span>
+              </div>
+              <el-progress 
+                :percentage="getTableProgressPercentage(scope.row)" 
+                :status="getTableProgressStatus(scope.row)"
+                :stroke-width="8"
+                :show-text="false"
+                :color="getProgressColor(scope.row)"
+              />
             </div>
-            <span v-else>-</span>
           </template>
         </el-table-column>
-        <el-table-column prop="lastRunTime" label="上次运行时间" />
-        <el-table-column prop="nextRunTime" label="下次运行时间" />
         <el-table-column prop="createTime" label="创建时间" />
-        <el-table-column label="操作" width="200">
+        <el-table-column label="操作" width="150">
           <template #default="scope">
-            <el-button 
-              size="small" 
-              type="success" 
-              @click="handleStart(scope.row)"
-              :disabled="scope.row.status === 'RUNNING' || scope.row.status === 'COMPLETED'"
-            >
-              启动
-            </el-button>
             <el-button 
               size="small" 
               type="danger" 
@@ -73,20 +73,168 @@
             <el-button size="small" type="danger" @click="handleDelete(scope.row)">删除</el-button>
           </template>
         </el-table-column>
-      </el-table>
+            </el-table>
 
-      <div class="pagination">
-        <el-pagination
-          v-model:current-page="pagination.current"
-          v-model:page-size="pagination.size"
-          :page-sizes="[10, 20, 50, 100]"
-          :total="pagination.total"
-          layout="total, sizes, prev, pager, next, jumper"
-          @size-change="handleSizeChange"
-          @current-change="handleCurrentChange"
-        />
-      </div>
-    </el-card>
+            <div class="pagination">
+              <el-pagination
+                v-model:current-page="pagination.current"
+                v-model:page-size="pagination.size"
+                :page-sizes="[10, 20, 50, 100]"
+                :total="pagination.total"
+                layout="total, sizes, prev, pager, next, jumper"
+                @size-change="handleSizeChange"
+                @current-change="handleCurrentChange"
+              />
+            </div>
+          </el-tab-pane>
+
+          <!-- 动态任务详情Tab -->
+          <el-tab-pane 
+            v-for="task in openedTasks"
+            :key="task.id"
+            :label="`任务详情 - ${task.name}`" 
+            :name="`detail-${task.id}`"
+            closable
+          >
+            <div v-if="getCurrentTask()" class="task-detail">
+              <!-- 基本信息 -->
+              <el-card class="detail-card">
+                <template #header>
+                  <div class="card-header">
+                    <span>基本信息</span>
+                  </div>
+                </template>
+                <el-descriptions :column="2" border>
+                  <el-descriptions-item label="任务ID">{{ getCurrentTask().id }}</el-descriptions-item>
+                  <el-descriptions-item label="任务名称">{{ getCurrentTask().name }}</el-descriptions-item>
+                  <el-descriptions-item label="任务状态">
+                    <el-tag :type="getStatusType(getCurrentTask().status)">
+                      {{ getStatusText(getCurrentTask().status) }}
+                    </el-tag>
+                  </el-descriptions-item>
+                  <el-descriptions-item label="创建时间">{{ getCurrentTask().createTime }}</el-descriptions-item>
+                  <el-descriptions-item label="任务描述">{{ getCurrentTask().description || '无' }}</el-descriptions-item>
+                </el-descriptions>
+              </el-card>
+
+              <!-- 执行进度 -->
+              <el-card class="detail-card">
+                <template #header>
+                  <div class="card-header">
+                    <span>执行进度</span>
+                    <el-button size="small" @click="refreshTaskProgress">刷新</el-button>
+                  </div>
+                </template>
+                <div class="progress-section">
+                  <div class="progress-overview">
+                    <el-row :gutter="20">
+                      <el-col :span="4">
+                        <div class="progress-item">
+                          <div class="progress-number">{{ getCalculatedProgress().totalCount }}</div>
+                          <div class="progress-label">总用例数</div>
+                        </div>
+                      </el-col>
+                      <el-col :span="4">
+                        <div class="progress-item">
+                          <div class="progress-number success">{{ getCalculatedProgress().successCount }}</div>
+                          <div class="progress-label">成功用例数</div>
+                        </div>
+                      </el-col>
+                      <el-col :span="4">
+                        <div class="progress-item">
+                          <div class="progress-number warning">{{ getCalculatedProgress().failedCount }}</div>
+                          <div class="progress-label">失败用例数</div>
+                        </div>
+                      </el-col>
+                      <el-col :span="4">
+                        <div class="progress-item">
+                          <div class="progress-number info">{{ getCalculatedProgress().runningCount }}</div>
+                          <div class="progress-label">执行中用例数</div>
+                        </div>
+                      </el-col>
+                      <el-col :span="4">
+                        <div class="progress-item">
+                          <div class="progress-number danger">{{ getCalculatedProgress().blockedCount }}</div>
+                          <div class="progress-label">阻塞用例数</div>
+                        </div>
+                      </el-col>
+                      <el-col :span="4">
+                        <div class="progress-item">
+                          <div class="progress-number">{{ getCalculatedProgress().pendingCount }}</div>
+                          <div class="progress-label">待执行用例数</div>
+                        </div>
+                      </el-col>
+                    </el-row>
+                  </div>
+                  
+                  <div class="progress-bar-section">
+                    <div class="progress-bar-label">
+                      执行进度: {{ getProgressPercentage() }}%
+                    </div>
+                    <el-progress 
+                      :percentage="getProgressPercentage()" 
+                      :status="getProgressStatus()"
+                      :stroke-width="20"
+                    />
+                  </div>
+                </div>
+              </el-card>
+
+              <!-- 用例例次执行信息 -->
+              <el-card class="detail-card">
+                <template #header>
+                  <div class="card-header">
+                    <span>用例例次执行信息</span>
+                    <el-button size="small" @click="refreshExecutionInstances">刷新</el-button>
+                  </div>
+                </template>
+                <div class="instances-section">
+                  <el-table :data="executionInstances" v-loading="instancesLoading" style="width: 100%">
+                    <el-table-column prop="testCaseId" label="用例ID" width="100" />
+                    <el-table-column prop="testCaseNumber" label="用例编号" width="120" />
+                    <el-table-column prop="testCaseName" label="用例名称" />
+                    <el-table-column prop="round" label="轮次" width="80" />
+                    <el-table-column prop="logicEnvironmentName" label="逻辑环境" width="150" />
+                    <el-table-column prop="executorIp" label="执行机IP" width="120" />
+                    <el-table-column prop="status" label="执行状态" width="100">
+                      <template #default="scope">
+                        <el-tag :type="getInstanceStatusType(scope.row.status)">
+                          {{ getInstanceStatusText(scope.row.status) }}
+                        </el-tag>
+                      </template>
+                    </el-table-column>
+                    <el-table-column prop="result" label="执行结果" width="100">
+                      <template #default="scope">
+                        <el-tag v-if="scope.row.result" :type="getInstanceResultType(scope.row.result)">
+                          {{ getInstanceResultText(scope.row.result) }}
+                        </el-tag>
+                        <span v-else>-</span>
+                      </template>
+                    </el-table-column>
+                    <el-table-column prop="failureReason" label="失败原因" width="200">
+                      <template #default="scope">
+                        <div v-if="scope.row.failureReason">
+                          <el-tooltip :content="scope.row.failureReason" placement="top" :show-after="500">
+                            <span class="failure-reason-text">{{ scope.row.failureReason }}</span>
+                          </el-tooltip>
+                        </div>
+                        <span v-else>-</span>
+                      </template>
+                    </el-table-column>
+                    <el-table-column prop="executionTaskId" label="执行任务ID" width="200" />
+                    <el-table-column prop="createTime" label="创建时间" width="160" />
+                    <el-table-column prop="updateTime" label="更新时间" width="160" />
+                  </el-table>
+                </div>
+              </el-card>
+            </div>
+            <div v-else class="no-task-selected">
+              <el-empty description="请先选择一个任务查看详情" />
+            </div>
+          </el-tab-pane>
+        </el-tabs>
+      </el-card>
+    </div>
 
     <!-- 4步创建对话框 -->
     <el-dialog
@@ -307,13 +455,7 @@
       </template>
     </el-dialog>
 
-    <!-- 任务详情对话框 -->
-    <el-dialog
-      v-model="detailDialogVisible"
-      :title="`任务详情 - ${selectedTask?.name}`"
-      width="1200px"
-      @close="closeDetailDialog"
-    >
+
       <div v-if="selectedTask" class="task-detail">
         <!-- 基本信息 -->
         <el-card class="detail-card">
@@ -330,21 +472,8 @@
                 {{ getStatusText(selectedTask.status) }}
               </el-tag>
             </el-descriptions-item>
-            <el-descriptions-item label="关联策略">{{ selectedTask.strategyName }}</el-descriptions-item>
-            <el-descriptions-item label="执行计划">{{ selectedTask.schedule || '立即执行' }}</el-descriptions-item>
             <el-descriptions-item label="创建时间">{{ selectedTask.createTime }}</el-descriptions-item>
-            <el-descriptions-item label="上次运行时间">{{ selectedTask.lastRunTime || '未运行' }}</el-descriptions-item>
-            <el-descriptions-item label="下次运行时间">{{ selectedTask.nextRunTime || '无' }}</el-descriptions-item>
             <el-descriptions-item label="任务描述">{{ selectedTask.description || '无' }}</el-descriptions-item>
-            <el-descriptions-item v-if="selectedTask.status === 'FAILED' && selectedTask.failureReason" label="失败原因">
-              <el-alert
-                :title="selectedTask.failureReason"
-                type="error"
-                :closable="false"
-                show-icon
-                style="margin: 0;"
-              />
-            </el-descriptions-item>
           </el-descriptions>
         </el-card>
 
@@ -500,12 +629,11 @@
           </div>
         </el-card>
       </div>
-    </el-dialog>
-  </div>
+    </div>
 </template>
 
 <script>
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@/utils/request'
 
@@ -518,9 +646,11 @@ export default {
     const dialogTitle = ref('')
     const submitLoading = ref(false)
     
+    // Tab相关
+    const activeTab = ref('list')
+    const openedTasks = ref([]) // 已打开的任务列表
+    
     // 任务详情相关
-    const detailDialogVisible = ref(false)
-    const selectedTask = ref(null)
     const taskProgress = ref({})
     const executionInstances = ref([])
     const instancesLoading = ref(false)
@@ -606,7 +736,6 @@ export default {
         'PENDING': 'info',
         'RUNNING': 'success',
         'COMPLETED': 'success',
-        'FAILED': 'danger',
         'STOPPED': 'info',
         'PAUSED': 'warning',
       }
@@ -618,11 +747,72 @@ export default {
         'PENDING': '待执行',
         'RUNNING': '运行中',
         'COMPLETED': '已完成',
-        'FAILED': '执行失败',
         'STOPPED': '已停止',
         'PAUSED': '已暂停',
+        'FAILED': '已停止', // 兼容旧数据，将FAILED状态显示为已停止
       }
       return textMap[status] || '未知'
+    }
+
+    // 表格进度相关方法
+    const getTableProgressText = (row) => {
+      const total = row.totalCount || 0
+      const completed = row.completedCount || 0
+      const success = row.successCount || 0
+      const failed = row.failedCount || 0
+      const blocked = row.blockedCount || 0
+      const running = row.runningCount || 0
+      
+      if (total === 0) {
+        return '暂无数据'
+      }
+      
+      const parts = []
+      if (success > 0) parts.push(`${success}成功`)
+      if (failed > 0) parts.push(`${failed}失败`)
+      if (blocked > 0) parts.push(`${blocked}阻塞`)
+      if (running > 0) parts.push(`${running}执行中`)
+      
+      return `${completed}/${total} (${parts.join(', ')})`
+    }
+
+    const getTableProgressPercentage = (row) => {
+      const total = row.totalCount || 0
+      const completed = row.completedCount || 0
+      
+      if (total === 0) {
+        return 0
+      }
+      
+      return Math.round((completed / total) * 100)
+    }
+
+    const getTableProgressStatus = (row) => {
+      const percentage = getTableProgressPercentage(row)
+      
+      if (percentage === 100) {
+        return 'success'
+      }
+      
+      if (row.status === 'RUNNING') {
+        return 'warning'
+      }
+      
+      return ''
+    }
+
+    const getProgressColor = (row) => {
+      const percentage = getTableProgressPercentage(row)
+      
+      if (percentage === 100) {
+        return '#67c23a'
+      }
+      
+      if (row.status === 'RUNNING') {
+        return '#e6a23c'
+      }
+      
+      return '#409eff'
     }
 
     // 计算属性
@@ -661,8 +851,68 @@ export default {
         })
         tableData.value = res.data.records
         pagination.total = res.data.total
+        
+        // 为每个任务加载真实的执行状态数据
+        await loadTaskExecutionStatus()
       } catch (error) {
         console.error('加载数据失败:', error)
+      } finally {
+        loading.value = false
+      }
+    }
+
+    // 加载任务执行状态数据
+    const loadTaskExecutionStatus = async () => {
+      try {
+        const promises = tableData.value.map(async (task) => {
+          try {
+            const res = await request({
+              url: `/collect-task/${task.id}/execution-instances`,
+              method: 'get',
+            })
+            
+            const instances = res.data || []
+            const totalCount = instances.length
+            const successCount = instances.filter(instance => instance.result === 'SUCCESS').length
+            const failedCount = instances.filter(instance => instance.result === 'FAILED').length
+            const blockedCount = instances.filter(instance => instance.result === 'BLOCKED').length
+            const runningCount = instances.filter(instance => instance.status === 'RUNNING').length
+            // 只要不是执行中，都算作已完成
+            const completedCount = instances.filter(instance => instance.status !== 'RUNNING').length
+            
+            // 更新任务数据
+            task.totalCount = totalCount
+            task.successCount = successCount
+            task.failedCount = failedCount
+            task.runningCount = runningCount
+            task.completedCount = completedCount
+            
+          } catch (error) {
+            console.error(`加载任务 ${task.id} 执行状态失败:`, error)
+            // 如果获取失败，使用默认值
+            task.totalCount = 0
+            task.successCount = 0
+            task.failedCount = 0
+            task.runningCount = 0
+            task.completedCount = 0
+          }
+        })
+        
+        await Promise.all(promises)
+      } catch (error) {
+        console.error('加载任务执行状态失败:', error)
+      }
+    }
+
+    // 刷新所有数据（包括任务列表和执行状态）
+    const refreshAllData = async () => {
+      loading.value = true
+      try {
+        await loadData()
+        ElMessage.success('数据刷新成功')
+      } catch (error) {
+        console.error('刷新数据失败:', error)
+        ElMessage.error('刷新数据失败')
       } finally {
         loading.value = false
       }
@@ -840,18 +1090,7 @@ export default {
       // 这里可以添加选择变化时的逻辑
     }
 
-    const handleStart = async (row) => {
-      try {
-        await request({
-          url: `/collect-task/${row.id}/start`,
-          method: 'post',
-        })
-        ElMessage.success('启动成功')
-        loadData()
-      } catch (error) {
-        ElMessage.error('启动失败')
-      }
-    }
+
 
     const handleStop = async (row) => {
       try {
@@ -988,17 +1227,58 @@ export default {
 
     // 任务详情相关方法
     const handleViewDetail = async (row) => {
-      selectedTask.value = row
-      detailDialogVisible.value = true
+      // 检查任务是否已经打开
+      const existingTask = openedTasks.value.find(task => task.id === row.id)
+      if (!existingTask) {
+        // 添加新任务到已打开列表
+        openedTasks.value.push(row)
+      }
+      
+      // 切换到对应的详情tab
+      const tabName = `detail-${row.id}`
+      activeTab.value = tabName
+      
+      // 加载任务数据
       await loadTaskProgress(row.id)
       await loadExecutionInstances(row.id)
     }
 
-    const closeDetailDialog = () => {
-      detailDialogVisible.value = false
-      selectedTask.value = null
-      taskProgress.value = {}
-      executionInstances.value = []
+    const handleTabClick = (tab) => {
+      if (tab.props.name === 'list') {
+        // 切换到列表tab时，清空数据
+        taskProgress.value = {}
+        executionInstances.value = []
+      } else if (tab.props.name.startsWith('detail-')) {
+        // 切换到详情tab时，加载对应任务的数据
+        const taskId = parseInt(tab.props.name.replace('detail-', ''))
+        loadTaskProgress(taskId)
+        loadExecutionInstances(taskId)
+      }
+    }
+
+    const handleTabRemove = (targetName) => {
+      // 从已打开列表中移除任务
+      const taskId = parseInt(targetName.replace('detail-', ''))
+      const index = openedTasks.value.findIndex(task => task.id === taskId)
+      if (index > -1) {
+        openedTasks.value.splice(index, 1)
+      }
+      
+      // 如果关闭的是当前激活的tab，切换到列表tab
+      if (activeTab.value === targetName) {
+        activeTab.value = 'list'
+        taskProgress.value = {}
+        executionInstances.value = []
+      }
+    }
+
+    // 获取当前tab对应的任务
+    const getCurrentTask = () => {
+      if (activeTab.value.startsWith('detail-')) {
+        const taskId = parseInt(activeTab.value.replace('detail-', ''))
+        return openedTasks.value.find(task => task.id === taskId)
+      }
+      return null
     }
 
     const loadTaskProgress = async (taskId) => {
@@ -1031,30 +1311,120 @@ export default {
     }
 
     const refreshTaskProgress = async () => {
-      if (selectedTask.value) {
-        await loadTaskProgress(selectedTask.value.id)
+      const currentTask = getCurrentTask()
+      if (currentTask) {
+        // 重新加载执行例次数据来更新进度计算
+        await loadExecutionInstances(currentTask.id)
       }
     }
 
     const refreshExecutionInstances = async () => {
-      if (selectedTask.value) {
-        await loadExecutionInstances(selectedTask.value.id)
+      const currentTask = getCurrentTask()
+      if (currentTask) {
+        await loadExecutionInstances(currentTask.id)
       }
     }
 
+    // 基于执行例次数据重新计算进度
     const getProgressPercentage = () => {
-      const total = taskProgress.value.totalCount || 0
-      const completed = (taskProgress.value.successCount || 0) + (taskProgress.value.failedCount || 0)
+      const instances = executionInstances.value || []
+      if (instances.length === 0) {
+        return 0
+      }
+      
+      const total = instances.length
+      const completed = instances.filter(instance => instance.status === 'COMPLETED').length
       return total > 0 ? Math.round((completed / total) * 100) : 0
     }
 
     const getProgressStatus = () => {
       const percentage = getProgressPercentage()
       if (percentage === 100) {
-        return taskProgress.value.failedCount > 0 ? 'exception' : 'success'
+        return 'success'
       }
       return ''
     }
+
+    // 计算属性：实时重新计算任务进度统计
+    const calculatedProgress = computed(() => {
+      const instances = executionInstances.value || []
+      if (instances.length === 0) {
+        return {
+          totalCount: 0,
+          completedCount: 0,
+          successCount: 0,
+          failedCount: 0,
+          blockedCount: 0,
+          runningCount: 0,
+          pendingCount: 0
+        }
+      }
+      
+      const totalCount = instances.length
+      const completedCount = instances.filter(instance => instance.status === 'COMPLETED').length
+      const successCount = instances.filter(instance => instance.result === 'SUCCESS').length
+      
+      // 将所有非SUCCESS的完成状态归类
+      const failedCount = instances.filter(instance => 
+        instance.status === 'COMPLETED' && 
+        instance.result && 
+        instance.result !== 'SUCCESS' && 
+        !['BLOCKED', 'TIMEOUT', 'PARTIAL_FAILURE'].includes(instance.result)
+      ).length
+      
+      // 将BLOCKED、TIMEOUT、PARTIAL_FAILURE等状态归类为阻塞
+      const blockedCount = instances.filter(instance => 
+        instance.status === 'COMPLETED' && 
+        instance.result && 
+        ['BLOCKED', 'TIMEOUT', 'PARTIAL_FAILURE'].includes(instance.result)
+      ).length
+      
+      const runningCount = instances.filter(instance => instance.status === 'RUNNING').length
+      const pendingCount = instances.filter(instance => instance.status === 'PENDING').length
+      
+      return {
+        totalCount,
+        completedCount,
+        successCount,
+        failedCount,
+        blockedCount,
+        runningCount,
+        pendingCount
+      }
+    })
+
+    // 重新计算任务进度统计（保持向后兼容）
+    const getCalculatedProgress = () => {
+      return calculatedProgress.value
+    }
+
+    // 计算属性：基于执行例次重新计算任务状态
+    const calculatedTaskStatus = computed(() => {
+      const progress = calculatedProgress.value
+      
+      if (progress.totalCount === 0) {
+        return 'PENDING'
+      }
+      
+      if (progress.runningCount > 0) {
+        return 'RUNNING'
+      }
+      
+      if (progress.completedCount === progress.totalCount) {
+        // 所有用例都已完成
+        if (progress.failedCount > 0 || progress.blockedCount > 0) {
+          return 'FAILED'
+        } else {
+          return 'COMPLETED'
+        }
+      }
+      
+      if (progress.pendingCount === progress.totalCount) {
+        return 'PENDING'
+      }
+      
+      return 'RUNNING'
+    })
 
     const getInstanceStatusType = (status) => {
       const typeMap = {
@@ -1063,6 +1433,7 @@ export default {
         'COMPLETED': 'success',
         'FAILED': 'danger',
         'STOPPED': 'info',
+        'BLOCKED': 'warning',
       }
       return typeMap[status] || 'info'
     }
@@ -1074,8 +1445,9 @@ export default {
         'COMPLETED': '已完成',
         'FAILED': '执行失败',
         'STOPPED': '已停止',
+        'BLOCKED': '阻塞',
       }
-      return textMap[status] || '未知'
+      return textMap[status] || '阻塞'
     }
 
     const getInstanceResultType = (result) => {
@@ -1093,7 +1465,7 @@ export default {
         'FAILED': '失败',
         'BLOCKED': '阻塞',
       }
-      return textMap[result] || '未知'
+      return textMap[result] || '阻塞'
     }
 
     const viewInstanceResult = (instance) => {
@@ -1101,9 +1473,41 @@ export default {
       ElMessage.info(`查看用例 ${instance.testCaseNumber} 第 ${instance.round} 轮执行详情，执行任务ID: ${instance.executionTaskId}`)
     }
 
+    // 自动刷新定时器
+    let autoRefreshTimer = null
+
+    // 启动自动刷新
+    const startAutoRefresh = () => {
+      if (autoRefreshTimer) {
+        clearInterval(autoRefreshTimer)
+      }
+      
+      // 每30秒自动刷新一次执行状态
+      autoRefreshTimer = setInterval(async () => {
+        const hasRunningTask = tableData.value.some(task => task.status === 'RUNNING')
+        if (hasRunningTask) {
+          await loadTaskExecutionStatus()
+        }
+      }, 30000)
+    }
+
+    // 停止自动刷新
+    const stopAutoRefresh = () => {
+      if (autoRefreshTimer) {
+        clearInterval(autoRefreshTimer)
+        autoRefreshTimer = null
+      }
+    }
+
     onMounted(() => {
       loadData()
       loadStrategyOptions()
+      startAutoRefresh()
+    })
+
+    // 组件卸载时清理定时器
+    onUnmounted(() => {
+      stopAutoRefresh()
     })
 
     return {
@@ -1135,6 +1539,10 @@ export default {
       environmentSummary,
       getStatusType,
       getStatusText,
+      getTableProgressText,
+      getTableProgressPercentage,
+      getTableProgressStatus,
+      getProgressColor,
       loadData,
       loadStrategyOptions,
       loadRegionOptions,
@@ -1142,7 +1550,6 @@ export default {
       loadProvinceOptions,
       loadCityOptions,
       handleAdd,
-      handleStart,
       handleStop,
       handleDelete,
       handleSubmit,
@@ -1157,15 +1564,23 @@ export default {
       handleEnvironmentSelection,
       handleSizeChange,
       handleCurrentChange,
+      refreshAllData,
+      
+      // Tab相关
+      activeTab,
+      openedTasks,
       
       // 任务详情相关
-      detailDialogVisible,
-      selectedTask,
       taskProgress,
       executionInstances,
       instancesLoading,
+      calculatedProgress,
+      calculatedTaskStatus,
       handleViewDetail,
-      closeDetailDialog,
+      handleTabClick,
+      handleTabRemove,
+      getCurrentTask,
+      getCalculatedProgress,
       refreshTaskProgress,
       refreshExecutionInstances,
       getProgressPercentage,
@@ -1183,6 +1598,49 @@ export default {
 <style scoped>
 .collect-task-page {
   padding: 20px;
+}
+
+/* 主内容区域布局 */
+.main-content {
+  width: 100%;
+}
+
+/* Tab样式 */
+.el-tabs {
+  height: 100%;
+}
+
+.el-tab-pane {
+  padding: 20px 0;
+}
+
+/* 详情卡片样式 */
+.task-detail .detail-card {
+  margin-bottom: 20px;
+}
+
+.task-detail .detail-card:last-child {
+  margin-bottom: 0;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.card-header span {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+}
+
+/* 无任务选择时的样式 */
+.no-task-selected {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 300px;
 }
 
 .table-operations {
@@ -1500,18 +1958,6 @@ export default {
   margin-top: 10px;
 }
 
-/* 失败原因文本样式 */
-.failure-reason-text {
-  color: #f56c6c;
-  font-size: 12px;
-  cursor: pointer;
-  display: inline-block;
-  max-width: 180px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* 响应式设计 */
 @media (max-width: 768px) {
   .progress-overview .el-col {
@@ -1534,6 +1980,56 @@ export default {
   .stat-number {
     font-size: 20px;
   }
+}
+
+/* 表格进度显示样式 */
+.progress-display {
+  width: 100%;
+  padding: 4px 0;
+}
+
+.progress-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.progress-text {
+  font-size: 12px;
+  color: #606266;
+  flex: 1;
+  line-height: 1.2;
+}
+
+.progress-percentage {
+  font-size: 12px;
+  color: #409eff;
+  font-weight: 600;
+  margin-left: 8px;
+  min-width: 40px;
+  text-align: right;
+}
+
+/* 进度条容器样式 */
+.progress-display .el-progress {
+  margin-top: 2px;
+}
+
+.progress-display .el-progress__text {
+  font-size: 11px;
+}
+
+/* 失败原因文本样式 */
+.failure-reason-text {
+  color: #f56c6c;
+  font-size: 12px;
+  cursor: pointer;
+  display: inline-block;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 </style>

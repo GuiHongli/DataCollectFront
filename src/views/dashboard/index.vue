@@ -147,7 +147,7 @@ export default {
         1: '运行中',
         2: '暂停',
       }
-      return statusMap[status] || '未知'
+      return statusMap[status] || '阻塞'
     }
 
     const loadStats = () => {
