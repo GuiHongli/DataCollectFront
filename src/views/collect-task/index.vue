@@ -18,7 +18,7 @@
               </el-button>
               <el-button @click="refreshAllData" :loading="loading">
                 <el-icon><Refresh /></el-icon>
-                {{ getRefreshButtonText() }}
+                刷新
               </el-button>
             </div>
 
@@ -880,21 +880,10 @@ export default {
       }
     }
 
-    // 加载任务执行状态数据（只加载未完成的任务）
+    // 加载任务执行状态数据
     const loadTaskExecutionStatus = async () => {
       try {
-        // 只加载未完成任务的执行状态
-        const unfinishedTasks = tableData.value.filter(task => 
-          task.status === 'PENDING' || 
-          task.status === 'RUNNING' || 
-          task.status === 'PAUSED'
-        )
-        
-        if (unfinishedTasks.length === 0) {
-          return
-        }
-        
-        const promises = unfinishedTasks.map(async (task) => {
+        const promises = tableData.value.map(async (task) => {
           try {
             const res = await request({
               url: `/collect-task/${task.id}/execution-instances`,
@@ -917,20 +906,6 @@ export default {
             task.runningCount = runningCount
             task.completedCount = completedCount
             
-            // 检查任务状态是否需要更新
-            if (completedCount === totalCount && totalCount > 0) {
-              // 所有用例都已完成，更新任务状态
-              if (successCount === totalCount) {
-                task.status = 'COMPLETED'
-              } else {
-                task.status = 'FAILED'
-              }
-            } else if (runningCount > 0) {
-              task.status = 'RUNNING'
-            } else if (completedCount === 0 && totalCount > 0) {
-              task.status = 'PENDING'
-            }
-            
           } catch (error) {
             console.error(`加载任务 ${task.id} 执行状态失败:`, error)
             // 如果获取失败，使用默认值
@@ -948,67 +923,12 @@ export default {
       }
     }
 
-    // 刷新未完成的任务数据
+    // 刷新所有数据（包括任务列表和执行状态）
     const refreshAllData = async () => {
       loading.value = true
       try {
-        // 只刷新未完成的任务
-        const unfinishedTasks = tableData.value.filter(task => 
-          task.status === 'PENDING' || 
-          task.status === 'RUNNING' || 
-          task.status === 'PAUSED'
-        )
-        
-        if (unfinishedTasks.length === 0) {
-          // 如果没有未完成的任务，只刷新任务列表
-          await loadData()
-          ElMessage.success('数据刷新成功')
-          return
-        }
-        
-        // 只刷新未完成任务的执行状态
-        await Promise.all(unfinishedTasks.map(async (task) => {
-          try {
-            const res = await request({
-              url: `/collect-task/${task.id}/execution-instances`,
-              method: 'get',
-            })
-            
-            const instances = res.data || []
-            const totalCount = instances.length
-            const successCount = instances.filter(instance => instance.result === 'SUCCESS').length
-            const failedCount = instances.filter(instance => instance.result === 'FAILED').length
-            const blockedCount = instances.filter(instance => instance.result === 'BLOCKED').length
-            const runningCount = instances.filter(instance => instance.status === 'RUNNING').length
-            const completedCount = instances.filter(instance => instance.status !== 'RUNNING').length
-            
-            // 更新任务数据
-            task.totalCount = totalCount
-            task.successCount = successCount
-            task.failedCount = failedCount
-            task.runningCount = runningCount
-            task.completedCount = completedCount
-            
-            // 检查任务状态是否需要更新
-            if (completedCount === totalCount && totalCount > 0) {
-              // 所有用例都已完成，更新任务状态
-              if (successCount === totalCount) {
-                task.status = 'COMPLETED'
-              } else {
-                task.status = 'FAILED'
-              }
-            } else if (runningCount > 0) {
-              task.status = 'RUNNING'
-            } else if (completedCount === 0 && totalCount > 0) {
-              task.status = 'PENDING'
-            }
-            
-          } catch (error) {
-            console.error(`刷新任务 ${task.id} 执行状态失败:`, error)
-          }
-        }))
-        
-        ElMessage.success(`已刷新 ${unfinishedTasks.length} 个未完成任务的状态`)
+        await loadData()
+        ElMessage.success('数据刷新成功')
       } catch (error) {
         console.error('刷新数据失败:', error)
         ElMessage.error('刷新数据失败')
@@ -1572,23 +1492,6 @@ export default {
       ElMessage.info(`查看用例 ${instance.testCaseNumber} 第 ${instance.round} 轮执行详情，执行任务ID: ${instance.executionTaskId}`)
     }
 
-    // 获取刷新按钮文本
-    const getRefreshButtonText = () => {
-      const unfinishedTasks = tableData.value.filter(task => 
-        task.status === 'PENDING' || 
-        task.status === 'RUNNING' || 
-        task.status === 'PAUSED'
-      )
-      
-      if (unfinishedTasks.length === 0) {
-        return '刷新'
-      } else if (unfinishedTasks.length === 1) {
-        return `刷新 (${unfinishedTasks.length}个未完成任务)`
-      } else {
-        return `刷新 (${unfinishedTasks.length}个未完成任务)`
-      }
-    }
-
     // 自动刷新定时器
     let autoRefreshTimer = null
 
@@ -1598,56 +1501,11 @@ export default {
         clearInterval(autoRefreshTimer)
       }
       
-      // 每30秒自动刷新一次未完成任务的执行状态
+      // 每30秒自动刷新一次执行状态
       autoRefreshTimer = setInterval(async () => {
-        const unfinishedTasks = tableData.value.filter(task => 
-          task.status === 'PENDING' || 
-          task.status === 'RUNNING' || 
-          task.status === 'PAUSED'
-        )
-        
-        if (unfinishedTasks.length > 0) {
-          // 只刷新未完成任务的执行状态
-          await Promise.all(unfinishedTasks.map(async (task) => {
-            try {
-              const res = await request({
-                url: `/collect-task/${task.id}/execution-instances`,
-                method: 'get',
-              })
-              
-              const instances = res.data || []
-              const totalCount = instances.length
-              const successCount = instances.filter(instance => instance.result === 'SUCCESS').length
-              const failedCount = instances.filter(instance => instance.result === 'FAILED').length
-              const blockedCount = instances.filter(instance => instance.result === 'BLOCKED').length
-              const runningCount = instances.filter(instance => instance.status === 'RUNNING').length
-              const completedCount = instances.filter(instance => instance.status !== 'RUNNING').length
-              
-              // 更新任务数据
-              task.totalCount = totalCount
-              task.successCount = successCount
-              task.failedCount = failedCount
-              task.runningCount = runningCount
-              task.completedCount = completedCount
-              
-              // 检查任务状态是否需要更新
-              if (completedCount === totalCount && totalCount > 0) {
-                // 所有用例都已完成，更新任务状态
-                if (successCount === totalCount) {
-                  task.status = 'COMPLETED'
-                } else {
-                  task.status = 'FAILED'
-                }
-              } else if (runningCount > 0) {
-                task.status = 'RUNNING'
-              } else if (completedCount === 0 && totalCount > 0) {
-                task.status = 'PENDING'
-              }
-              
-            } catch (error) {
-              console.error(`自动刷新任务 ${task.id} 执行状态失败:`, error)
-            }
-          }))
+        const hasRunningTask = tableData.value.some(task => task.status === 'RUNNING')
+        if (hasRunningTask) {
+          await loadTaskExecutionStatus()
         }
       }, 30000)
     }
@@ -1751,7 +1609,6 @@ export default {
       getInstanceResultType,
       getInstanceResultText,
       viewInstanceResult,
-      getRefreshButtonText,
     }
   },
 }
