@@ -229,7 +229,15 @@ export default {
 
     const handleEdit = (row) => {
       dialogTitle.value = '编辑策略'
-      Object.assign(form, row)
+      // 只复制必要的字段，避免传递额外字段
+      Object.assign(form, {
+        id: row.id,
+        name: row.name,
+        collectCount: row.collectCount,
+        testCaseSetId: row.testCaseSetId,
+        description: row.description,
+        status: row.status,
+      })
       dialogVisible.value = true
     }
 
@@ -258,18 +266,27 @@ export default {
       try {
         await formRef.value.validate()
         
+        // 只发送必要的字段
+        const submitData = {
+          name: form.name,
+          collectCount: form.collectCount,
+          testCaseSetId: form.testCaseSetId,
+          description: form.description,
+          status: form.status,
+        }
+        
         if (form.id) {
           await request({
             url: `/collect-strategy/${form.id}`,
             method: 'put',
-            data: form,
+            data: submitData,
           })
           ElMessage.success('更新成功')
         } else {
           await request({
             url: '/collect-strategy',
             method: 'post',
-            data: form,
+            data: submitData,
           })
           ElMessage.success('创建成功')
         }
