@@ -3,7 +3,7 @@ import { ElMessage } from 'element-plus'
 
 const service = axios.create({
   baseURL: '/api',
-  timeout: 10000,
+  timeout: 300000, // 5分钟超时，支持大文件上传
 })
 
 // 请求拦截器

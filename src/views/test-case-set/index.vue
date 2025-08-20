@@ -115,7 +115,8 @@
             </div>
             <template #tip>
               <div class="el-upload__tip">
-                只能上传zip文件，且文件名格式为：用例集名称_版本.zip
+                只能上传zip文件，且文件名格式为：用例集名称_版本.zip<br>
+                文件大小限制：100MB
               </div>
             </template>
           </el-upload>
@@ -247,6 +248,13 @@ export default {
       const isZip = file.type === 'application/zip' || file.name.endsWith('.zip')
       if (!isZip) {
         ElMessage.error('只能上传zip文件!')
+        return false
+      }
+      
+      // 检查文件大小（100MB限制）
+      const maxSize = 100 * 1024 * 1024 // 100MB
+      if (file.size > maxSize) {
+        ElMessage.error('文件大小不能超过100MB!')
         return false
       }
       
