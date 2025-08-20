@@ -752,7 +752,6 @@ export default {
 
     const getStatusType = (status) => {
       const typeMap = {
-        'PENDING': 'info',
         'RUNNING': 'success',
         'COMPLETED': 'success',
         'STOPPED': 'info',
@@ -763,12 +762,11 @@ export default {
 
     const getStatusText = (status) => {
       const textMap = {
-        'PENDING': '待执行',
         'RUNNING': '运行中',
         'COMPLETED': '已完成',
         'STOPPED': '已停止',
         'PAUSED': '已暂停',
-        'FAILED': '已停止', // 兼容旧数据，将FAILED状态显示为已停止
+        'FAILED': '已停止',
       }
       return textMap[status] || '未知'
     }
