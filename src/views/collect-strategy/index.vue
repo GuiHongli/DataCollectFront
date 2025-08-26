@@ -18,8 +18,16 @@
       </div>
 
       <el-table :data="tableData" v-loading="loading" style="width: 100%">
-        <el-table-column prop="name" label="策略名称" />
-        <el-table-column prop="collectCount" label="采集次数" />
+        <el-table-column prop="name" label="策略名称" min-width="150" />
+        <el-table-column label="采集意图" width="120">
+          <template #default="scope">
+            <el-tag v-if="scope.row.intentName" size="small" type="warning">
+              {{ scope.row.intentName }}
+            </el-tag>
+            <span v-else style="color: #909399;">未配置</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="collectCount" label="采集次数" width="100" />
         <el-table-column label="用例集" min-width="300">
           <template #default="scope">
             <div v-if="scope.row.testCaseSetName">
@@ -68,14 +76,6 @@
             <span v-else style="color: #909399;">无筛选</span>
           </template>
         </el-table-column>
-        <el-table-column label="采集意图" width="120">
-          <template #default="scope">
-            <el-tag v-if="scope.row.intentName" size="small" type="warning">
-              {{ scope.row.intentName }}
-            </el-tag>
-            <span v-else style="color: #909399;">未配置</span>
-          </template>
-        </el-table-column>
         <el-table-column prop="description" label="描述" />
         <el-table-column prop="status" label="状态">
           <template #default="scope">
@@ -121,6 +121,20 @@
       >
         <el-form-item label="策略名称" prop="name">
           <el-input v-model="form.name" placeholder="请输入策略名称" />
+        </el-form-item>
+        <el-form-item label="采集意图" prop="intent">
+          <el-select 
+            v-model="form.intent" 
+            placeholder="请选择采集意图" 
+            style="width: 100%"
+          >
+            <el-option
+              v-for="intent in intentOptions"
+              :key="intent.code"
+              :label="intent.name"
+              :value="intent.code"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item label="采集次数" prop="collectCount">
           <el-input-number
@@ -171,21 +185,6 @@
               :key="app"
               :label="app"
               :value="app"
-            />
-          </el-select>
-        </el-form-item>
-        
-        <el-form-item label="采集意图" prop="intent">
-          <el-select 
-            v-model="form.intent" 
-            placeholder="请选择采集意图" 
-            style="width: 100%"
-          >
-            <el-option
-              v-for="intent in intentOptions"
-              :key="intent.code"
-              :label="intent.name"
-              :value="intent.code"
             />
           </el-select>
         </el-form-item>
