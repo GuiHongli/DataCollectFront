@@ -83,6 +83,18 @@
             <span v-else style="color: #909399;">未配置</span>
           </template>
         </el-table-column>
+        <el-table-column prop="businessCategory" label="业务大类" width="120">
+          <template #default="scope">
+            <span v-if="scope.row.businessCategory">{{ scope.row.businessCategory }}</span>
+            <span v-else style="color: #909399;">未配置</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="app" label="App" width="120">
+          <template #default="scope">
+            <span v-if="scope.row.app">{{ scope.row.app }}</span>
+            <span v-else style="color: #909399;">未配置</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="testSteps" label="测试步骤" min-width="200">
           <template #default="scope">
             <div class="test-steps">
