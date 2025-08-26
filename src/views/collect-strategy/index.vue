@@ -76,6 +76,18 @@
             <span v-else style="color: #909399;">无筛选</span>
           </template>
         </el-table-column>
+        <el-table-column label="自定义参数" min-width="200">
+          <template #default="scope">
+            <div v-if="scope.row.customParamList && scope.row.customParamList.length > 0">
+              <div v-for="param in scope.row.customParamList" :key="param.key" class="param-tag">
+                <el-tag size="small" type="info">
+                  {{ param.key }}: {{ param.value }}
+                </el-tag>
+              </div>
+            </div>
+            <span v-else style="color: #909399;">无参数</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="description" label="描述" />
         <el-table-column prop="status" label="状态">
           <template #default="scope">
@@ -135,6 +147,66 @@
               :value="intent.code"
             />
           </el-select>
+        </el-form-item>
+        
+        <!-- 自定义参数列表 -->
+        <el-form-item label="自定义参数">
+          <div class="custom-params-container">
+            <div class="custom-params-header">
+              <span class="params-title">参数列表</span>
+              <el-button 
+                type="primary" 
+                size="small" 
+                @click="addCustomParam"
+                :icon="Plus"
+              >
+                添加参数
+              </el-button>
+            </div>
+            
+            <div v-if="form.customParams.length === 0" class="empty-params">
+              <el-empty description="暂无自定义参数" :image-size="60" />
+            </div>
+            
+            <div v-else class="custom-params-list">
+              <div 
+                v-for="(param, index) in form.customParams" 
+                :key="index" 
+                class="param-item"
+              >
+                <el-form-item 
+                  :prop="`customParams.${index}.key`" 
+                  :rules="customParamRules.key"
+                  style="margin-bottom: 0;"
+                >
+                  <el-input 
+                    v-model="param.key" 
+                    placeholder="参数键" 
+                    style="width: 200px;"
+                  />
+                </el-form-item>
+                <el-form-item 
+                  :prop="`customParams.${index}.value`" 
+                  :rules="customParamRules.value"
+                  style="margin-bottom: 0;"
+                >
+                  <el-input 
+                    v-model="param.value" 
+                    placeholder="参数值" 
+                    style="width: 200px;"
+                  />
+                </el-form-item>
+                <el-button 
+                  type="danger" 
+                  size="small" 
+                  @click="removeCustomParam(index)"
+                  :icon="Delete"
+                >
+                  删除
+                </el-button>
+              </div>
+            </div>
+          </div>
         </el-form-item>
         <el-form-item label="采集次数" prop="collectCount">
           <el-input-number
@@ -266,7 +338,7 @@
 <script>
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Link } from '@element-plus/icons-vue'
+import { Link, Plus, Delete } from '@element-plus/icons-vue'
 import request from '@/utils/request'
 
 export default {
@@ -284,6 +356,14 @@ export default {
     const businessCategoryOptions = ref([])
     const appOptions = ref([])
     const intentOptions = ref([])
+    const customParamRules = reactive({
+      key: [
+        { required: true, message: '请输入参数键', trigger: 'blur' }
+      ],
+      value: [
+        { required: true, message: '请输入参数值', trigger: 'blur' }
+      ]
+    })
 
     const pagination = reactive({
       current: 1,
@@ -299,6 +379,7 @@ export default {
       businessCategory: '',
       app: '',
       intent: '',
+      customParams: [],
       description: '',
       status: 1,
     })
@@ -416,6 +497,16 @@ export default {
       appOptions.value = []
     }
 
+    // 添加自定义参数
+    const addCustomParam = () => {
+      form.customParams.push({ key: '', value: '' })
+    }
+
+    // 删除自定义参数
+    const removeCustomParam = (index) => {
+      form.customParams.splice(index, 1)
+    }
+
     // 筛选后的用例列表（根据策略配置的筛选条件）
     const filteredTestCaseList = computed(() => {
       if (!testCaseList.value.length) {
@@ -456,6 +547,7 @@ export default {
         businessCategory: row.businessCategory || '',
         app: row.app || '',
         intent: row.intent || '',
+        customParams: row.customParamList || [],
         description: row.description,
         status: row.status,
       })
@@ -500,6 +592,7 @@ export default {
           businessCategory: form.businessCategory || null,
           app: form.app || null,
           intent: form.intent || null,
+          customParams: form.customParams.length > 0 ? JSON.stringify(form.customParams) : null,
           description: form.description,
           status: form.status,
         }
@@ -536,6 +629,7 @@ export default {
         businessCategory: '',
         app: '',
         intent: '',
+        customParams: [],
         description: '',
         status: 1,
       })
@@ -580,6 +674,7 @@ export default {
       businessCategoryOptions,
       appOptions,
       intentOptions,
+      customParamRules,
       filteredTestCaseList,
       loadData,
       loadTestCaseSetOptions,
@@ -587,6 +682,8 @@ export default {
       handleTestCaseSetChange,
       extractFilterOptions,
       clearFilterOptions,
+      addCustomParam,
+      removeCustomParam,
       handleAdd,
       handleEdit,
       handleDelete,
@@ -669,6 +766,56 @@ export default {
   border: 1px solid #e4e7ed;
   border-radius: 4px;
   overflow: hidden;
+}
+
+/* 自定义参数样式 */
+.custom-params-container {
+  border: 1px solid #e4e7ed;
+  border-radius: 4px;
+  padding: 12px;
+  background-color: #fafafa;
+}
+
+.custom-params-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.params-title {
+  font-size: 14px;
+  color: #606266;
+  font-weight: 500;
+}
+
+.empty-params {
+  text-align: center;
+  padding: 20px 0;
+}
+
+.custom-params-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.param-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background-color: #fff;
+  border: 1px solid #e4e7ed;
+  border-radius: 4px;
+}
+
+.param-tag {
+  margin-bottom: 4px;
+}
+
+.param-tag:last-child {
+  margin-bottom: 0;
 }
 
 .test-case-table .el-table {
