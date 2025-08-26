@@ -22,6 +22,18 @@
         <el-table-column prop="ueId" label="UE ID" />
         <el-table-column prop="purpose" label="用途" />
         <el-table-column prop="networkTypeName" label="网络类型" />
+        <el-table-column prop="brandName" label="品牌">
+          <template #default="scope">
+            <span v-if="scope.row.brandName">{{ scope.row.brandName }}</span>
+            <span v-else style="color: #909399;">未配置</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="port" label="端口">
+          <template #default="scope">
+            <span v-if="scope.row.port && scope.row.port !== '0'">{{ scope.row.port }}</span>
+            <span v-else style="color: #909399;">0</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="description" label="描述" />
         <el-table-column prop="status" label="状态">
           <template #default="scope">
@@ -84,6 +96,23 @@
             />
           </el-select>
         </el-form-item>
+        <el-form-item label="品牌" prop="brand">
+          <el-select v-model="form.brand" placeholder="请选择品牌" style="width: 100%">
+            <el-option
+              v-for="item in brandOptions"
+              :key="item.code"
+              :label="item.name"
+              :value="item.code"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="端口" prop="port">
+          <el-input 
+            v-model="form.port" 
+            placeholder="请输入端口号"
+            style="width: 100%"
+          />
+        </el-form-item>
         <el-form-item label="描述" prop="description">
           <el-input
             v-model="form.description"
@@ -123,6 +152,7 @@ export default {
     const dialogTitle = ref('')
     const formRef = ref()
     const networkTypeOptions = ref([])
+    const brandOptions = ref([])
 
     const pagination = reactive({
       current: 1,
@@ -136,7 +166,9 @@ export default {
       ueId: '',
       purpose: '',
       networkTypeId: null,
-      description: '',
+              brand: '',
+        port: '0',
+        description: '',
       status: 1,
     })
 
@@ -188,6 +220,18 @@ export default {
       }
     }
 
+    const loadBrandOptions = async () => {
+      try {
+        const res = await request({
+          url: '/ue/brands',
+          method: 'get',
+        })
+        brandOptions.value = res.data
+      } catch (error) {
+        console.error('加载品牌数据失败:', error)
+      }
+    }
+
     const handleAdd = () => {
       dialogTitle.value = '新增UE'
       dialogVisible.value = true
@@ -196,7 +240,18 @@ export default {
 
     const handleEdit = (row) => {
       dialogTitle.value = '编辑UE'
-      Object.assign(form, row)
+      // 只提取实体类中存在的字段，避免DTO字段导致的反序列化错误
+      Object.assign(form, {
+        id: row.id,
+        name: row.name,
+        ueId: row.ueId,
+        purpose: row.purpose,
+        networkTypeId: row.networkTypeId,
+        brand: row.brand,
+        port: row.port,
+        description: row.description,
+        status: row.status,
+      })
       dialogVisible.value = true
     }
 
@@ -255,6 +310,8 @@ export default {
         ueId: '',
         purpose: '',
         networkTypeId: null,
+        brand: '',
+        port: '0',
         description: '',
         status: 1,
       })
@@ -276,6 +333,7 @@ export default {
     onMounted(() => {
       loadData()
       loadNetworkTypeOptions()
+      loadBrandOptions()
     })
 
     return {
@@ -288,6 +346,7 @@ export default {
       form,
       rules,
       networkTypeOptions,
+      brandOptions,
       loadData,
       handleAdd,
       handleEdit,
