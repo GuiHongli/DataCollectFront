@@ -55,6 +55,27 @@
             <span v-else style="color: #909399;">未配置</span>
           </template>
         </el-table-column>
+        <el-table-column label="筛选条件" min-width="200">
+          <template #default="scope">
+            <div v-if="scope.row.businessCategory || scope.row.app">
+              <div v-if="scope.row.businessCategory" class="filter-tag">
+                <el-tag size="small" type="info">业务大类: {{ scope.row.businessCategory }}</el-tag>
+              </div>
+              <div v-if="scope.row.app" class="filter-tag">
+                <el-tag size="small" type="success">App: {{ scope.row.app }}</el-tag>
+              </div>
+            </div>
+            <span v-else style="color: #909399;">无筛选</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="采集意图" width="120">
+          <template #default="scope">
+            <el-tag v-if="scope.row.intentName" size="small" type="warning">
+              {{ scope.row.intentName }}
+            </el-tag>
+            <span v-else style="color: #909399;">未配置</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="description" label="描述" />
         <el-table-column prop="status" label="状态">
           <template #default="scope">
@@ -111,7 +132,7 @@
           />
         </el-form-item>
         <el-form-item label="用例集" prop="testCaseSetId">
-          <el-select v-model="form.testCaseSetId" placeholder="请选择用例集" style="width: 100%">
+          <el-select v-model="form.testCaseSetId" placeholder="请选择用例集" style="width: 100%" @change="handleTestCaseSetChange">
             <el-option
               v-for="item in testCaseSetOptions"
               :key="item.id"
@@ -119,6 +140,104 @@
               :value="item.id"
             />
           </el-select>
+        </el-form-item>
+        
+        <!-- 筛选条件配置 -->
+        <el-form-item label="业务大类筛选" v-if="selectedTestCaseSet">
+          <el-select 
+            v-model="form.businessCategory" 
+            placeholder="选择业务大类（可选）" 
+            clearable 
+            style="width: 100%"
+          >
+            <el-option
+              v-for="category in businessCategoryOptions"
+              :key="category"
+              :label="category"
+              :value="category"
+            />
+          </el-select>
+        </el-form-item>
+        
+        <el-form-item label="App筛选" v-if="selectedTestCaseSet">
+          <el-select 
+            v-model="form.app" 
+            placeholder="选择App（可选）" 
+            clearable 
+            style="width: 100%"
+          >
+            <el-option
+              v-for="app in appOptions"
+              :key="app"
+              :label="app"
+              :value="app"
+            />
+          </el-select>
+        </el-form-item>
+        
+        <el-form-item label="采集意图" prop="intent">
+          <el-select 
+            v-model="form.intent" 
+            placeholder="请选择采集意图" 
+            style="width: 100%"
+          >
+            <el-option
+              v-for="intent in intentOptions"
+              :key="intent.code"
+              :label="intent.name"
+              :value="intent.code"
+            />
+          </el-select>
+        </el-form-item>
+        
+        <!-- 用例列表显示 -->
+        <el-form-item label="包含用例" v-if="selectedTestCaseSet">
+          <div class="test-case-list-container">
+            <div class="test-case-summary">
+              <span class="summary-text">共 {{ filteredTestCaseList.length }} 个测试用例</span>
+              <el-button 
+                type="text" 
+                size="small" 
+                @click="showTestCaseList = !showTestCaseList"
+              >
+                {{ showTestCaseList ? '收起' : '展开' }}
+              </el-button>
+            </div>
+            
+            <div v-if="showTestCaseList" class="test-case-table">
+              <el-table :data="filteredTestCaseList" size="small" max-height="300">
+                <el-table-column prop="name" label="用例名称" min-width="150" />
+                <el-table-column prop="number" label="用例编号" width="100" />
+                <el-table-column prop="businessCategory" label="业务大类" width="120">
+                  <template #default="scope">
+                    <span v-if="scope.row.businessCategory">{{ scope.row.businessCategory }}</span>
+                    <span v-else style="color: #909399;">未配置</span>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="app" label="App" width="100">
+                  <template #default="scope">
+                    <span v-if="scope.row.app">{{ scope.row.app }}</span>
+                    <span v-else style="color: #909399;">未配置</span>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="logicNetwork" label="逻辑组网" min-width="150">
+                  <template #default="scope">
+                    <div v-if="scope.row.logicNetwork">
+                      <el-tag 
+                        v-for="network in scope.row.logicNetwork.split(';')" 
+                        :key="network"
+                        size="small"
+                        style="margin-right: 4px; margin-bottom: 4px;"
+                      >
+                        {{ network }}
+                      </el-tag>
+                    </div>
+                    <span v-else style="color: #909399;">未配置</span>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </div>
+          </div>
         </el-form-item>
         <el-form-item label="描述" prop="description">
           <el-input
@@ -146,7 +265,7 @@
 </template>
 
 <script>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Link } from '@element-plus/icons-vue'
 import request from '@/utils/request'
@@ -160,6 +279,12 @@ export default {
     const dialogTitle = ref('')
     const formRef = ref()
     const testCaseSetOptions = ref([])
+    const selectedTestCaseSet = ref(null)
+    const testCaseList = ref([])
+    const showTestCaseList = ref(false)
+    const businessCategoryOptions = ref([])
+    const appOptions = ref([])
+    const intentOptions = ref([])
 
     const pagination = reactive({
       current: 1,
@@ -172,6 +297,9 @@ export default {
       name: '',
       collectCount: 1,
       testCaseSetId: null,
+      businessCategory: '',
+      app: '',
+      intent: '',
       description: '',
       status: 1,
     })
@@ -185,6 +313,9 @@ export default {
       ],
       testCaseSetId: [
         { required: true, message: '请选择用例集', trigger: 'change' },
+      ],
+      intent: [
+        { required: true, message: '请选择采集意图', trigger: 'change' },
       ],
     }
 
@@ -221,6 +352,94 @@ export default {
       }
     }
 
+    const loadIntentOptions = async () => {
+      try {
+        const res = await request({
+          url: '/collect-strategy/intents',
+          method: 'get',
+        })
+        intentOptions.value = res.data
+      } catch (error) {
+        console.error('加载采集意图选项失败:', error)
+      }
+    }
+
+    const handleTestCaseSetChange = async (testCaseSetId) => {
+      if (testCaseSetId) {
+        // 获取选中的用例集信息
+        const testCaseSet = testCaseSetOptions.value.find(item => item.id === testCaseSetId)
+        selectedTestCaseSet.value = testCaseSet
+        
+        // 加载用例列表
+        try {
+          const res = await request({
+            url: `/test-case-set/${testCaseSetId}/test-cases`,
+            method: 'get',
+          })
+          testCaseList.value = res.data
+          showTestCaseList.value = true // 自动展开用例列表
+          
+          // 提取业务大类和App选项（用于策略配置）
+          extractFilterOptions()
+        } catch (error) {
+          console.error('加载用例列表失败:', error)
+          testCaseList.value = []
+        }
+      } else {
+        selectedTestCaseSet.value = null
+        testCaseList.value = []
+        showTestCaseList.value = false
+        clearFilterOptions()
+      }
+    }
+
+    // 提取筛选选项（用于策略配置）
+    const extractFilterOptions = () => {
+      const categories = new Set()
+      const apps = new Set()
+      
+      testCaseList.value.forEach(testCase => {
+        if (testCase.businessCategory) {
+          categories.add(testCase.businessCategory)
+        }
+        if (testCase.app) {
+          apps.add(testCase.app)
+        }
+      })
+      
+      businessCategoryOptions.value = Array.from(categories).sort()
+      appOptions.value = Array.from(apps).sort()
+    }
+
+    // 清除筛选选项
+    const clearFilterOptions = () => {
+      businessCategoryOptions.value = []
+      appOptions.value = []
+    }
+
+    // 筛选后的用例列表（根据策略配置的筛选条件）
+    const filteredTestCaseList = computed(() => {
+      if (!testCaseList.value.length) {
+        return []
+      }
+
+      return testCaseList.value.filter(testCase => {
+        // 业务大类筛选
+        if (form.businessCategory && testCase.businessCategory !== form.businessCategory) {
+          return false
+        }
+        
+        // App筛选
+        if (form.app && testCase.app !== form.app) {
+          return false
+        }
+        
+        return true
+      })
+    })
+
+
+
     const handleAdd = () => {
       dialogTitle.value = '新增策略'
       dialogVisible.value = true
@@ -235,10 +454,18 @@ export default {
         name: row.name,
         collectCount: row.collectCount,
         testCaseSetId: row.testCaseSetId,
+        businessCategory: row.businessCategory || '',
+        app: row.app || '',
+        intent: row.intent || '',
         description: row.description,
         status: row.status,
       })
       dialogVisible.value = true
+      
+      // 如果选择了用例集，加载用例列表
+      if (row.testCaseSetId) {
+        handleTestCaseSetChange(row.testCaseSetId)
+      }
     }
 
     const handleDelete = async (row) => {
@@ -271,6 +498,9 @@ export default {
           name: form.name,
           collectCount: form.collectCount,
           testCaseSetId: form.testCaseSetId,
+          businessCategory: form.businessCategory || null,
+          app: form.app || null,
+          intent: form.intent || null,
           description: form.description,
           status: form.status,
         }
@@ -304,9 +534,16 @@ export default {
         name: '',
         collectCount: 1,
         testCaseSetId: null,
+        businessCategory: '',
+        app: '',
+        intent: '',
         description: '',
         status: 1,
       })
+      selectedTestCaseSet.value = null
+      testCaseList.value = []
+      showTestCaseList.value = false
+      clearFilterOptions()
       if (formRef.value) {
         formRef.value.resetFields()
       }
@@ -325,6 +562,7 @@ export default {
     onMounted(() => {
       loadData()
       loadTestCaseSetOptions()
+      loadIntentOptions()
     })
 
     return {
@@ -337,8 +575,19 @@ export default {
       form,
       rules,
       testCaseSetOptions,
+      selectedTestCaseSet,
+      testCaseList,
+      showTestCaseList,
+      businessCategoryOptions,
+      appOptions,
+      intentOptions,
+      filteredTestCaseList,
       loadData,
       loadTestCaseSetOptions,
+      loadIntentOptions,
+      handleTestCaseSetChange,
+      extractFilterOptions,
+      clearFilterOptions,
       handleAdd,
       handleEdit,
       handleDelete,
@@ -395,4 +644,41 @@ export default {
 .test-case-set-info .el-link {
   font-size: 11px;
 }
+
+/* 用例列表样式 */
+.test-case-list-container {
+  border: 1px solid #e4e7ed;
+  border-radius: 4px;
+  padding: 12px;
+  background-color: #fafafa;
+}
+
+.test-case-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.summary-text {
+  font-size: 14px;
+  color: #606266;
+  font-weight: 500;
+}
+
+.test-case-table {
+  border: 1px solid #e4e7ed;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.test-case-table .el-table {
+  background-color: white;
+}
+
+.test-case-table .el-table th {
+  background-color: #f5f7fa;
+}
+
+
 </style>
