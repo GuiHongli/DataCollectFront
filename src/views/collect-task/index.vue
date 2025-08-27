@@ -308,12 +308,164 @@
             </el-form-item>
             <div v-if="selectedStrategy" class="strategy-info">
               <h4>策略详情</h4>
-              <el-descriptions :column="1" border size="small">
+              <el-descriptions :column="2" border size="small">
                 <el-descriptions-item label="策略名称">{{ selectedStrategy.name }}</el-descriptions-item>
+                <el-descriptions-item label="采集意图">
+                  <el-tag v-if="selectedStrategy.intentName" size="small" type="warning">
+                    {{ selectedStrategy.intentName }}
+                  </el-tag>
+                  <span v-else style="color: #909399;">未配置</span>
+                </el-descriptions-item>
                 <el-descriptions-item label="采集次数">{{ selectedStrategy.collectCount }}次</el-descriptions-item>
                 <el-descriptions-item label="关联用例集">{{ selectedStrategy.testCaseSetName }} ({{ selectedStrategy.testCaseSetVersion }})</el-descriptions-item>
-                <el-descriptions-item label="测试用例数量">{{ selectedStrategy.testCaseList ? selectedStrategy.testCaseList.length : 0 }}个</el-descriptions-item>
+                <el-descriptions-item label="业务大类筛选">
+                  <el-tag v-if="selectedStrategy.businessCategory" size="small" type="info">
+                    {{ selectedStrategy.businessCategory }}
+                  </el-tag>
+                  <span v-else style="color: #909399;">无筛选</span>
+                </el-descriptions-item>
+                <el-descriptions-item label="APP筛选">
+                  <el-tag v-if="selectedStrategy.app" size="small" type="success">
+                    {{ selectedStrategy.app }}
+                  </el-tag>
+                  <span v-else style="color: #909399;">无筛选</span>
+                </el-descriptions-item>
+                <el-descriptions-item label="测试用例数量" :span="2">
+                  <span>{{ getFilteredTestCaseCount() }}个</span>
+                  <span v-if="selectedStrategy.businessCategory || selectedStrategy.app" style="color: #909399; margin-left: 8px;">
+                    (已筛选)
+                  </span>
+                </el-descriptions-item>
+                <el-descriptions-item label="自定义参数" :span="2">
+                  <div class="custom-params-section">
+                    <div class="custom-params-header">
+                      <span>自定义参数配置</span>
+                      <el-button 
+                        type="text" 
+                        size="small" 
+                        @click="showCustomParamsEditor = !showCustomParamsEditor"
+                      >
+                        {{ showCustomParamsEditor ? '收起' : '编辑' }}
+                      </el-button>
+                    </div>
+                    
+                    <!-- 编辑模式 -->
+                    <div v-if="showCustomParamsEditor" class="custom-params-editor">
+                      <div 
+                        v-for="(param, index) in editableCustomParams" 
+                        :key="index" 
+                        class="param-item"
+                      >
+                        <el-input 
+                          v-model="param.key" 
+                          placeholder="参数名" 
+                          style="width: 150px; margin-right: 8px;"
+                        />
+                        <el-input 
+                          v-model="param.value" 
+                          placeholder="参数值" 
+                          style="width: 200px; margin-right: 8px;"
+                        />
+                        <el-button 
+                          type="danger" 
+                          size="small" 
+                          @click="removeCustomParam(index)"
+                          :disabled="editableCustomParams.length === 1"
+                        >
+                          删除
+                        </el-button>
+                      </div>
+                      <el-button 
+                        type="primary" 
+                        size="small" 
+                        @click="addCustomParam"
+                        style="margin-top: 8px;"
+                      >
+                        添加参数
+                      </el-button>
+                      <div class="param-actions" style="margin-top: 12px;">
+                        <el-button 
+                          type="primary" 
+                          size="small" 
+                          @click="saveCustomParams"
+                        >
+                          保存
+                        </el-button>
+                        <el-button 
+                          size="small" 
+                          @click="cancelCustomParamsEdit"
+                        >
+                          取消
+                        </el-button>
+                      </div>
+                    </div>
+                    
+                    <!-- 只读模式 -->
+                    <div v-else>
+                      <div v-if="editableCustomParams && editableCustomParams.length > 0">
+                        <el-tag 
+                          v-for="param in editableCustomParams" 
+                          :key="param.key" 
+                          size="small" 
+                          type="info"
+                          style="margin-right: 8px; margin-bottom: 4px;"
+                        >
+                          {{ param.key }}: {{ param.value }}
+                        </el-tag>
+                      </div>
+                      <span v-else style="color: #909399;">无参数</span>
+                    </div>
+                  </div>
+                </el-descriptions-item>
               </el-descriptions>
+              
+              <!-- 筛选后的用例列表 -->
+              <div v-if="selectedStrategy.testCaseList && selectedStrategy.testCaseList.length > 0" class="filtered-test-cases">
+                <h4>筛选后的测试用例</h4>
+                <div class="test-cases-summary">
+                  <span class="summary-text">共 {{ getFilteredTestCaseCount() }} 个测试用例</span>
+                  <el-button 
+                    type="text" 
+                    size="small" 
+                    @click="showFilteredTestCases = !showFilteredTestCases"
+                  >
+                    {{ showFilteredTestCases ? '收起' : '展开' }}
+                  </el-button>
+                </div>
+                <div v-if="showFilteredTestCases" class="test-cases-table">
+                  <el-table :data="getFilteredTestCases()" size="small" max-height="300">
+                    <el-table-column prop="name" label="用例名称" min-width="150" />
+                    <el-table-column prop="number" label="用例编号" width="100" />
+                    <el-table-column prop="businessCategory" label="业务大类" width="120">
+                      <template #default="scope">
+                        <span v-if="scope.row.businessCategory">{{ scope.row.businessCategory }}</span>
+                        <span v-else style="color: #909399;">未配置</span>
+                      </template>
+                    </el-table-column>
+                    <el-table-column prop="app" label="App" width="100">
+                      <template #default="scope">
+                        <span v-if="scope.row.app">{{ scope.row.app }}</span>
+                        <span v-else style="color: #909399;">未配置</span>
+                      </template>
+                    </el-table-column>
+                    <el-table-column prop="logicNetwork" label="逻辑组网" min-width="150">
+                      <template #default="scope">
+                        <div v-if="scope.row.logicNetwork">
+                          <el-tag 
+                            v-for="network in scope.row.logicNetwork.split(';')" 
+                            :key="network"
+                            size="small"
+                            style="margin-right: 4px; margin-bottom: 4px;"
+                          >
+                            {{ network }}
+                          </el-tag>
+                        </div>
+                        <span v-else style="color: #909399;">未配置</span>
+                      </template>
+                    </el-table-column>
+                  </el-table>
+                </div>
+              </div>
             </div>
           </el-form>
         </div>
@@ -695,6 +847,14 @@ export default {
     
     // 选中的逻辑环境ID列表
     const selectedEnvironmentIds = ref([])
+    
+    // 筛选用例相关
+    const showFilteredTestCases = ref(false)
+    
+    // 自定义参数相关
+    const showCustomParamsEditor = ref(false)
+    const editableCustomParams = ref([])
+    const originalCustomParams = ref([])
 
     const pagination = reactive({
       current: 1,
@@ -1043,12 +1203,84 @@ export default {
         const strategy = strategyOptions.value.find(s => s.id === strategyId)
         if (strategy) {
           selectedStrategy.value = strategy
+          // 初始化自定义参数
+          initializeCustomParams()
           await loadAvailableEnvironments()
         }
       } else {
         selectedStrategy.value = null
         availableEnvironments.value = []
+        // 清空自定义参数
+        editableCustomParams.value = []
+        originalCustomParams.value = []
       }
+    }
+    
+    // 初始化自定义参数
+    const initializeCustomParams = () => {
+      if (selectedStrategy.value && selectedStrategy.value.customParamList) {
+        // 深拷贝原始参数
+        originalCustomParams.value = JSON.parse(JSON.stringify(selectedStrategy.value.customParamList))
+        // 初始化可编辑参数
+        editableCustomParams.value = JSON.parse(JSON.stringify(selectedStrategy.value.customParamList))
+        
+        // 如果没有参数，添加一个空的参数项
+        if (editableCustomParams.value.length === 0) {
+          editableCustomParams.value.push({ key: '', value: '' })
+        }
+      } else {
+        editableCustomParams.value = [{ key: '', value: '' }]
+        originalCustomParams.value = []
+      }
+      showCustomParamsEditor.value = false
+    }
+    
+    // 添加自定义参数
+    const addCustomParam = () => {
+      editableCustomParams.value.push({ key: '', value: '' })
+    }
+    
+    // 删除自定义参数
+    const removeCustomParam = (index) => {
+      editableCustomParams.value.splice(index, 1)
+      // 确保至少有一个参数项
+      if (editableCustomParams.value.length === 0) {
+        editableCustomParams.value.push({ key: '', value: '' })
+      }
+    }
+    
+    // 保存自定义参数
+    const saveCustomParams = () => {
+      // 过滤掉空的参数项
+      const validParams = editableCustomParams.value.filter(param => param.key.trim() !== '' && param.value.trim() !== '')
+      
+      // 检查是否有重复的key
+      const keys = validParams.map(param => param.key.trim())
+      const uniqueKeys = [...new Set(keys)]
+      if (keys.length !== uniqueKeys.length) {
+        ElMessage.error('参数名不能重复')
+        return
+      }
+      
+      // 更新策略中的自定义参数
+      if (selectedStrategy.value) {
+        selectedStrategy.value.customParamList = validParams
+        // 更新原始参数
+        originalCustomParams.value = JSON.parse(JSON.stringify(validParams))
+      }
+      
+      showCustomParamsEditor.value = false
+      ElMessage.success('自定义参数保存成功')
+    }
+    
+    // 取消自定义参数编辑
+    const cancelCustomParamsEdit = () => {
+      // 恢复到原始参数
+      editableCustomParams.value = JSON.parse(JSON.stringify(originalCustomParams.value))
+      if (editableCustomParams.value.length === 0) {
+        editableCustomParams.value.push({ key: '', value: '' })
+      }
+      showCustomParamsEditor.value = false
     }
 
     // 环境选择事件处理
@@ -1105,6 +1337,36 @@ export default {
     // 处理逻辑环境选择变化
     const handleEnvironmentSelection = () => {
       // 这里可以添加选择变化时的逻辑
+    }
+
+    // 获取筛选后的用例数量
+    const getFilteredTestCaseCount = () => {
+      if (!selectedStrategy.value || !selectedStrategy.value.testCaseList) {
+        return 0
+      }
+
+      return getFilteredTestCases().length
+    }
+
+    // 获取筛选后的用例列表
+    const getFilteredTestCases = () => {
+      if (!selectedStrategy.value || !selectedStrategy.value.testCaseList) {
+        return []
+      }
+
+      return selectedStrategy.value.testCaseList.filter(testCase => {
+        // 业务大类筛选
+        if (selectedStrategy.value.businessCategory && testCase.businessCategory !== selectedStrategy.value.businessCategory) {
+          return false
+        }
+        
+        // App筛选
+        if (selectedStrategy.value.app && testCase.app !== selectedStrategy.value.app) {
+          return false
+        }
+        
+        return true
+      })
     }
 
 
@@ -1169,6 +1431,12 @@ export default {
           provinceId: environmentForm.provinceId,
           cityId: environmentForm.cityId,
           logicEnvironmentIds: selectedEnvironmentIds.value,
+          // 添加自定义参数（过滤掉空的参数项）
+          customParams: editableCustomParams.value
+            .filter(param => param.key.trim() !== '' && param.value.trim() !== '')
+            .length > 0 
+            ? JSON.stringify(editableCustomParams.value.filter(param => param.key.trim() !== '' && param.value.trim() !== ''))
+            : null,
         }
         
         await request({
@@ -1553,6 +1821,15 @@ export default {
       availableEnvironments,
       environmentsLoading,
       selectedEnvironmentIds,
+      showFilteredTestCases,
+      
+      // 自定义参数相关
+      showCustomParamsEditor,
+      editableCustomParams,
+      addCustomParam,
+      removeCustomParam,
+      saveCustomParams,
+      cancelCustomParamsEdit,
       environmentSummary,
       getStatusType,
       getStatusText,
@@ -1579,6 +1856,8 @@ export default {
       loadAvailableEnvironments,
       toggleEnvironmentSelection,
       handleEnvironmentSelection,
+      getFilteredTestCaseCount,
+      getFilteredTestCases,
       handleSizeChange,
       handleCurrentChange,
       refreshAllData,
@@ -2060,6 +2339,81 @@ export default {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-family: 'Courier New', monospace;
+}
+
+/* 筛选后的用例列表样式 */
+.filtered-test-cases {
+  margin-top: 16px;
+  border: 1px solid #e4e7ed;
+  border-radius: 4px;
+  padding: 12px;
+  background-color: #fafafa;
+}
+
+.filtered-test-cases h4 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  color: #303133;
+  font-weight: 500;
+}
+
+.test-cases-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.summary-text {
+  font-size: 14px;
+  color: #606266;
+  font-weight: 500;
+}
+
+.test-cases-table {
+  border: 1px solid #e4e7ed;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+/* 自定义参数相关样式 */
+.custom-params-section {
+  width: 100%;
+}
+
+.custom-params-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.custom-params-header span {
+  font-size: 14px;
+  color: #303133;
+  font-weight: 500;
+}
+
+.custom-params-editor {
+  border: 1px solid #e4e7ed;
+  border-radius: 4px;
+  padding: 12px;
+  background-color: #fafafa;
+}
+
+.param-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.param-item:last-child {
+  margin-bottom: 0;
+}
+
+.param-actions {
+  display: flex;
+  gap: 8px;
 }
 
 </style>
