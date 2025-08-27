@@ -18,6 +18,7 @@
       </div>
 
       <el-table :data="tableData" v-loading="loading" style="width: 100%">
+        <el-table-column prop="id" label="策略ID" width="80" />
         <el-table-column prop="name" label="策略名称" min-width="150" />
         <el-table-column label="采集意图" width="120">
           <template #default="scope">
