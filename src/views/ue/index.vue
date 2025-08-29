@@ -22,9 +22,9 @@
         <el-table-column prop="ueId" label="UE ID" />
         <el-table-column prop="purpose" label="用途" />
         <el-table-column prop="networkTypeName" label="网络类型" />
-        <el-table-column prop="brandName" label="品牌">
+        <el-table-column prop="vendorName" label="厂商">
           <template #default="scope">
-            <span v-if="scope.row.brandName">{{ scope.row.brandName }}</span>
+            <span v-if="scope.row.vendorName">{{ scope.row.vendorName }}</span>
             <span v-else style="color: #909399;">未配置</span>
           </template>
         </el-table-column>
@@ -96,10 +96,10 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="品牌" prop="brand">
-          <el-select v-model="form.brand" placeholder="请选择品牌" style="width: 100%">
+        <el-form-item label="厂商" prop="vendor">
+          <el-select v-model="form.vendor" placeholder="请选择厂商" style="width: 100%">
             <el-option
-              v-for="item in brandOptions"
+              v-for="item in vendorOptions"
               :key="item.code"
               :label="item.name"
               :value="item.code"
@@ -152,7 +152,7 @@ export default {
     const dialogTitle = ref('')
     const formRef = ref()
     const networkTypeOptions = ref([])
-    const brandOptions = ref([])
+    const vendorOptions = ref([])
 
     const pagination = reactive({
       current: 1,
@@ -166,9 +166,9 @@ export default {
       ueId: '',
       purpose: '',
       networkTypeId: null,
-              brand: '',
-        port: '0',
-        description: '',
+      vendor: '',
+      port: '0',
+      description: '',
       status: 1,
     })
 
@@ -220,15 +220,15 @@ export default {
       }
     }
 
-    const loadBrandOptions = async () => {
+    const loadVendorOptions = async () => {
       try {
         const res = await request({
-          url: '/ue/brands',
+          url: '/ue/vendors',
           method: 'get',
         })
-        brandOptions.value = res.data
+        vendorOptions.value = res.data
       } catch (error) {
-        console.error('加载品牌数据失败:', error)
+        console.error('加载厂商数据失败:', error)
       }
     }
 
@@ -247,7 +247,7 @@ export default {
         ueId: row.ueId,
         purpose: row.purpose,
         networkTypeId: row.networkTypeId,
-        brand: row.brand,
+        vendor: row.vendor,
         port: row.port,
         description: row.description,
         status: row.status,
@@ -310,7 +310,7 @@ export default {
         ueId: '',
         purpose: '',
         networkTypeId: null,
-        brand: '',
+        vendor: '',
         port: '0',
         description: '',
         status: 1,
@@ -333,7 +333,7 @@ export default {
     onMounted(() => {
       loadData()
       loadNetworkTypeOptions()
-      loadBrandOptions()
+      loadVendorOptions()
     })
 
     return {
@@ -346,7 +346,7 @@ export default {
       form,
       rules,
       networkTypeOptions,
-      brandOptions,
+      vendorOptions,
       loadData,
       handleAdd,
       handleEdit,
